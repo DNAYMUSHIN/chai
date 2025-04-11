@@ -3,7 +3,7 @@
 const db = require('../db');
 const XLSX = require('xlsx')
 const StylePlugin = require('xlsx-style') 
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 const {ProductType} = require('../constants')
 const { time, error } = require('console');
 //const { Parser } = require('json2csv');

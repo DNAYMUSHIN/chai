@@ -3,9 +3,9 @@ const router = new Router();
 const adminController = require('../controller/admin.controller');
 
 
-router.post('/registerAd', adminController.createAdmin);
+//router.post('/registerAd', adminController.createAdmin);
 
-router.post('/loginAd', adminController.enterAdmin);
+//router.post('/loginAd', adminController.enterAdmin);
 // Route for adding a product
 router.post('/product/add', adminController.addProduct);
 

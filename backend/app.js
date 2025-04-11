@@ -1,6 +1,5 @@
 require('dotenv').config()
 const express = require('express')
-const customerRouter = require('./routes/customer.routes')
 const adminRouter = require('./routes/admin.routes')
 const PORT =  process.env.PORT;
 console.log(PORT)
@@ -9,7 +8,7 @@ console.log(PORT)
 const app = express()
 
 app.use(express.json())
-app.use('/api', customerRouter)
+//app.use('/api', customerRouter)
 app.use('/admin', adminRouter)
 
 
