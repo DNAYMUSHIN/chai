@@ -1,0 +1,502 @@
+openapi: 3.0.0
+info:
+  title: CRM Platform API (Tea Shop)
+  description: API для управления товарами, заказами, клиентской базой и категориями.
+  version: 1.0.0
+servers:
+  - url: http://localhost:8000
+    description: Локальный сервер
+
+paths:
+  /auth/login:
+    post:
+      tags:
+        - Authorization
+      summary: Авторизация пользователя
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Успешная авторизация
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+
+  /auth/refresh:
+    post:
+      tags:
+        - Authorization
+      summary: Обновление токена доступа
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshTokenRequest'
+      responses:
+        '200':
+          description: Токен успешно обновлен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+
+  /clients/{id}:
+    get:
+      tags:
+        - Clients
+      summary: Получить информацию о клиенте
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Client'
+      security:
+        - Authorization: []
+
+  /products/{uid}:
+    get:
+      tags: 
+        - Products
+      summary: Получить продукт по UID
+      parameters:
+        - name: uid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+      security:
+        - Authorization: []
+        
+  /products/barcode/{barcode}:
+    get:
+      tags:
+        - Products
+      summary: Получить товар по номеру штрихкода
+      parameters:
+        - name: barcode
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+      security:
+        - Authorization: []
+
+  /products/search:
+    get:
+      tags:
+        - Products
+      summary: Поиск товара по символу
+      parameters:
+        - name: query
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Product'
+      security:
+        - Authorization: []
+
+  /products/export:
+    get:
+      tags:
+        - Products
+      summary: Выгрузить товары в Excel
+      parameters:
+        - name: filter
+          in: query
+          required: false
+          schema:
+            type: integer
+            enum: [0, 1, 2, 3, 4]
+          description: Фильтр (0 - all, 1 - available, 2 - finished, 3 - disabled, 4 - next_purchase)
+      responses:
+        '200':
+          description: Excel файл успешно выгружен
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+      security:
+        - Authorization: []
+
+  /orders:
+    get:
+      tags:
+        - Orders
+      summary: Получить список заказов
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: integer
+            enum: [0, 1, 2]
+          description: Фильтр (0 - все заказы, 1 - закрытые, 2 - текущие)
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Order'
+      security:
+        - Authorization: []
+    post:
+      tags: 
+        - Orders
+      summary: Создать заказ
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderCreateRequest'
+      responses:
+        '201':
+          description: Заказ успешно создан
+      security:
+        - Authorization: []
+        
+  /orders/{uid}: 
+    get: 
+      tags: 
+        - Orders 
+      summary: Получить заказ по UID 
+      parameters:
+        - name: uid 
+          in: path 
+          required: true 
+          schema: 
+            type: string 
+            
+      responses: 
+        '200': 
+          description: Успешный ответ 
+          content: 
+            application/json:
+              schema: 
+                $ref: '#/components/schemas/Order' 
+      security: 
+        - Authorization: []
+          
+  /orders/{uid}/status:
+    patch:
+      tags:
+        - Orders
+      summary: Обновить статус заказа
+      parameters:
+        - name: uid
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderStatusUpdateRequest'
+    
+      responses:
+        '200':
+          description: Статус заказа успешно обновлен
+      security:
+        - Authorization: []
+
+  /categories:
+    get:
+      tags:
+        - Category
+      summary: Получить список категорий
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Category'
+      security:
+        - Authorization: []
+    post:
+      tags:
+        - Category
+      summary: Добавить новую категорию
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CategoryCreateRequest'
+      responses:
+        '201':
+          description: Категория успешно добавлена
+      security:
+        - Authorization: []
+
+  /categories/{id}:
+    delete:
+      tags:
+        - Category
+      summary: Удалить категорию
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Категория успешно удалена
+      security:
+        - Authorization: []
+    patch:
+      tags:
+        - Category
+      summary: Изменить категорию
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CategoryUpdateRequest'
+      responses:
+        '200':
+          description: Категория успешно обновлена
+      security:
+        - Authorization: []
+
+components:
+  securitySchemes:
+      Authorization:
+        type: http
+        scheme: bearer
+        bearerFormat: JWT
+
+  schemas:
+    RegisterRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        login:
+          type: string
+        password:
+          type: string
+
+    LoginRequest:
+      type: object
+      properties:
+        login:
+          type: string
+        password:
+          type: string
+
+    RefreshTokenRequest:
+      type: object
+      properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+
+    AuthResponse:
+      type: object
+      properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+
+    Client:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        phone:
+          type: string
+        orderHistory:
+         type: array
+         items:
+           type: string
+         description: Список UID заказов
+
+    ClientCreateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        phone:
+          type: string
+        password:
+          type: string
+
+    ClientUpdateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        phone:
+          type: string
+
+    Product:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        pricePerUnit:
+          type: integer
+        quantity:
+          type: integer
+        minimumStock:
+          type: integer
+        status:
+          type: string
+        measurementUnit:
+          type: string
+        gramsPerUnit:
+          type: integer
+        totalQuantity:
+          type: integer
+        barcode:
+          type: string
+
+    Category:
+      type: object
+      properties:
+        uid:
+          type: string
+        name:
+          type: string
+        products:
+          type: array
+          items:
+            type: string
+
+    CategoryCreateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+
+    CategoryUpdateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+
+    Order:
+      type: object
+      properties:
+        uid:
+          type: string
+        clientUid:
+          type: string
+          nullable: true
+        orderNumber:
+          type: string
+        products:
+          type: array
+          items:
+            type: object
+            properties:
+              productUid:
+                type: string
+              quantity:
+                type: integer
+        totalAmount:
+          type: integer
+        status:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    OrderSummary:
+      type: object
+      properties:
+        uid:
+          type: string
+        clientUid:
+          type: string
+          nullable: true
+        totalAmount:
+          type: integer
+        status:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    OrderCreateRequest:
+      type: object
+      properties:
+        clientUid:
+          type: string
+          nullable: true
+        products:
+          type: array
+          items:
+            type: object
+            properties:
+              productUid:
+                type: string
+              quantity:
+                type: integer
+
+    OrderStatusUpdateRequest:
+      type: object
+      properties:
+        status:
+          type: integer
+
