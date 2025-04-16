@@ -3,9 +3,9 @@ const router = new Router();
 const adminController = require('../controller/admin.controller');
 
 
-//router.post('/registerAd', adminController.createAdmin);
+router.post('/registerAd', adminController.createAdmin);
 
-//router.post('/loginAd', adminController.enterAdmin);
+router.post('/loginAd', adminController.enterAdmin);
 // Route for adding a product
 router.post('/product/add', adminController.addProduct);
 
@@ -24,7 +24,7 @@ router.put('/order/status', adminController.updateOrderStatus);
 router.post('/order/create', adminController.createOrder);
 
 // Route for generating sales reports
-router.get('/report', adminController.generateReport);
+router.get('/report', adminController.generateDailyReport);
 
 // Route for creating an order via barcode scanning
 //router.post('/order/create-barcode', adminController.createOrderWithBarcode);

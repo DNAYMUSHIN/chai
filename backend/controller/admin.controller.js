@@ -1,12 +1,11 @@
 // Maks was here
 
 const db = require('../db');
-const XLSX = require('xlsx')
-const StylePlugin = require('xlsx-style') 
+const reportHelpers = require('./utils')
+
 const bcrypt = require('bcryptjs');
 const {ProductType} = require('../constants')
 const { time, error } = require('console');
-//const { Parser } = require('json2csv');
 class adminController{
 /*
 Управление товарами
@@ -247,61 +246,21 @@ async updateOrderStatus(req, res) {
 }
 
 
+// Генерация отчета за день. Показывает, 
+async generateDailyReport(req, res){
+    const day = req.body
+    const daily = day["day"].split('.').reverse().join('-')
+    console.log(daily)
+    const Orders = await db.query(`SELECT * FROM orders WHERE createdat::date = $1`, [daily])
+    console.log(Orders.rows[0], "A")
 
-// Генерация отчетов 
-
-async generateReport(req, res){
-    const {} = req.body;
-
-    let product = []
-    const product_in_Table = await db.query(`SELECT * FROM product where product_status = $1`, [1])
-    for (const element of product_in_Table.rows){
-        product.push(element)
-    }
-    const worksheet = XLSX.utils.json_to_sheet(product);
-    
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, `Отчет`);
-
-    XLSX.writeFile(workbook, `Отчет.xlsx`);
-    res.send("")
-
+    await reportHelpers.foo([Orders.rows[0]], "Чайная Лавка",daily)
+    res.status(200).send("OOOO")
 }
 
 
 
-
-// Создание заказа через QR-code
-// async createOrderWithBarcode(req, res) {
-//     const { customer_id, barcode } = req.body;
-
-//     if (!customer_id || !barcode) {
-//         return res.status(400).json({ error: 'Некорректные данные' });
-//     }
-
-//     try {
-//         const product = await db.query(`SELECT * FROM Product WHERE product_code = $1`, [barcode]);
-
-//         if (product.rows.length === 0) {
-//             return res.status(404).json({ error: 'Товар не найден' });
-//         }
-
-//         const createdAt = new Date();
-//         const status = 1; // Активный заказ
-
-//         const newOrder = await db.query(
-//             `INSERT INTO "Order" (product, customer_id, qunity, createdAt, status, total) 
-//              VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-//             [[product.rows[0].product_id], customer_id, 1, createdAt, status, product.rows[0].product_price_unit]
-//         );
-
-//         res.status(201).json({ message: 'Заказ создан через штрих-код', order: newOrder.rows[0] });
-//     } catch (err) {
-//         console.error('Ошибка создания заказа через штрих-код:', err);
-//         res.status(500).json({ error: 'Ошибка сервера' });
-//     }
-// }
-
+ 
 
 
 }
