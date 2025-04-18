@@ -65,11 +65,12 @@ async enterAdmin(req, res){
     
     const check = await bcrypt.compare(password, password_with_table)
     if(check){
-        res.status(201);
+        res.status(201).send("Вы вошли");
     }
     else{
-        res.status(404);
-    }    
+        res.status(404).send("Неправильный пароль");
+    }
+     
 
 }
 
