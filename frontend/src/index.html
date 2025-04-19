@@ -11,25 +11,25 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
 <body class="body">
-
+  <div class="body__inner-wrapper">
+<!--
+-->
     <p id="number" style="font-size: 150px;"></p>
     <script>
         async function fetchNumber() {
             try {
-                const response = await fetch('http://localhost:3001/api/number');
+                const response = await fetch('/api/number');
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                 const data = await response.json();
                 document.getElementById('number').innerText = data.number;
             } catch (error) {
-                document.getElementById('number').innerText = 'Error fetching number';
-                console.error('Error:', error);
+                document.getElementById('number').innerText = 'Error: ' + error.message;
+                console.error('Fetch error:', error);
             }
         }
-        
         fetchNumber();
     </script>
 
-  <div class="body__inner-wrapper">
-    
     <div class="popup__wrapper popup__create-order excel">
     <div class="create-order popup">
         <div class="popup__header">
@@ -509,14 +509,28 @@
         </div>
     </div>
 </div>
+    <div class="popup__wrapper popup__add-category invisible">
+    <div class="add-category popup">
+        <div class="popup__header">
+            <div class="add-category__button-wrapper">
+                <button class="create-order__button button add-category__button-reject">Отменить создание</button>
+            </div>
+            <div class="add-category__create-category-wrapper">
+                <p class="add-category__create-category-title">Введите название новой категории:</p>
+                <input type="text" class="add-category__create-category create-category">
+                <button class="create-order__button button add-category__button-do">Cоздать категорию</button>
+            </div>
+        </div>
+    </div>
+</div>
     <section class="main">
     <aside class="aside">
         <div class="aside__inner-wrapper">
             <h1 class="title">Лавка</h1>
             <div class="aside__links">
-                <a href="#" class="aside__link link link_active">Заказы</a>
-                <a href="#" class="aside__link link">Товары</a>
-                <a href="#" class="aside__link link">Категории</a>
+                <a id="menu-orders" class="aside__link link link_active">Заказы</a>
+                <a id="menu-products" class="aside__link link">Товары</a>
+                <a id="menu-categories" class="aside__link link">Категории</a>
             </div>
         </div>
     </aside>

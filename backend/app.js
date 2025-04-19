@@ -9,13 +9,14 @@ const app = express()
 
 app.use(express.json())
 //app.use('/api', customerRouter)
-app.use('/admin', adminRouter)
+//app.use('/admin', adminRouter)
+app.use('/api', adminRouter)
 
 
 
 
 
-app.listen(PORT, ()=>console.log(PORT, `Server started on port ${PORT}`))
+app.listen(PORT, '0.0.0.0', ()=>console.log(PORT, `Server started on port ${PORT}`))
 
 
 

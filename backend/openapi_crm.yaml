@@ -4,7 +4,7 @@ info:
   description: API для управления товарами, заказами, клиентской базой и категориями.
   version: 1.0.0
 servers:
-  - url: http://localhost:8000
+  - url: http://backend:3001
     description: Локальный сервер
 
 paths:
