@@ -28,6 +28,43 @@
             }
         }
         fetchNumber();
+
+
+        async function enterAdmin() {
+            const adminData = {
+                admin_email: "123@gmail.com",
+                password: "123"
+            };
+
+            try {
+                const response = await fetch('/api/loginAd', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json', // Указываем, что отправляем JSON
+                    },
+                    body: JSON.stringify(adminData), // Преобразуем объект в JSON-строку
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Ошибка HTTP: ${response.status}`);
+                }
+
+                const data = await response.json(); // Парсим JSON-ответ
+                console.log('Успешный вход:', data);
+
+                // Дополнительная логика (например, сохранение токена в localStorage)
+                if (data.token) {
+                    localStorage.setItem('adminToken', data.token);
+                }
+
+            } catch (error) {
+                console.error('Ошибка входа:', error);
+                alert('Неверный email или пароль'); // Или другая обработка ошибки
+            }
+        }
+
+        // Вызываем функцию
+        enterAdmin();
     </script>
 
     <div class="popup__wrapper popup__create-order excel">

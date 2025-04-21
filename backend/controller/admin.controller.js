@@ -55,6 +55,11 @@ async createAdmin(req, res){
 }
 
 async enterAdmin(req, res){
+    //const randomNumber = Math.floor(Math.random() * 100);
+    //res.json({ number: randomNumber });
+
+
+
     const {admin_email, password} = req.body;
     const tmp_admin = await db.query(`select * from admin where admin_email = $1`, [admin_email]);
     console.log(tmp_admin.rows[0])
