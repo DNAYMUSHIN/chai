@@ -30,7 +30,16 @@ router.get('/report', adminController.generateDailyReport);
 //router.post('/order/create-barcode', adminController.createOrderWithBarcode);
 
 
+
+
+
+
 // Route for generating sales reports
+
+router.post('/reportProduct', adminController.generateProductReport);
+
+
+
 router.get('/number', (req, res) => {  // Добавлены req, res
     const randomNumber = Math.floor(Math.random() * 100);
     res.json({ number: randomNumber });            

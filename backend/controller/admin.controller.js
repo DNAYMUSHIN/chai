@@ -2,7 +2,6 @@
 
 const db = require('../db');
 const reportHelpers = require('./utils')
-
 const bcrypt = require('bcryptjs');
 const {ProductType} = require('../constants')
 const { time, error } = require('console');
@@ -55,6 +54,30 @@ async createAdmin(req, res){
 }
 
 async enterAdmin(req, res){
+
+
+    const {admin_email, password} = req.body;
+    console.log(admin_email, password)
+
+    try{
+        const admin = await db.query(`SELECT * FROM Admin 
+            WHERE admin_email = $1 and admin_password = $2`,
+        [admin_email, password])
+        if (admin.rows.length > 0) {  
+            console.log(admin.rows[0])
+            res.status(201).send(admin.rows[0])
+        }
+        else{
+            res.status(401).json({message: "Неправильный логин и пароль"})
+        }
+    }
+    catch(err){
+        console.log(err)
+        res.status(501).json({message: "Ошибка сервера"})
+    }
+
+    
+    /*
     const {admin_email, password} = req.body;
     const tmp_admin = await db.query(`select * from admin where admin_email = $1`, [admin_email]);
     console.log(tmp_admin.rows[0])
@@ -69,7 +92,7 @@ async enterAdmin(req, res){
     }
     else{
         res.status(404).send("Неправильный пароль");
-    }
+    }*/
      
 
 }
@@ -197,7 +220,9 @@ async createOrder(req, res){
     const newOrder  = await db.query(`INSERT INTO orders (admin_id, createdat, status, total)
              VALUES ($1, $2, $3, $4) RETURNING *`, [admin_id, time, 0, total])
 
+        
     try{
+        let index = 0
         for (const element of product) {
             await db.query(
                 `INSERT INTO orderitems (order_id, product_id, quantity, price)
@@ -212,15 +237,16 @@ async createOrder(req, res){
 
             const updateproduct = await db.query(
                 `UPDATE Product SET quantity = $1 WHERE product_id = $2 RETURNING *`,
-                [information.rows[0].quantity - element.quantity, element.product_id]
+                [information.rows[index].quantity - element.quantity, element.product_id]
             );
 
-            if (updateproduct.rows[0].quantity < 20) {
+            if (updateproduct.rows[index].quantity < updateproduct.rows[index].product_count_min) {
                 await db.query(
                     `UPDATE Product SET product_status = $1 WHERE product_id = $2`,
                     [0, element.product_id]
                 );
             }
+            index++
         }
         res.status(201)
     }
@@ -255,15 +281,51 @@ async generateDailyReport(req, res){
     const Orders = await db.query(`SELECT * FROM orders WHERE createdat::date = $1`, [daily])
     console.log(Orders.rows[0], "A")
 
-    await reportHelpers.foo([Orders.rows[0]], "Чайная Лавка",daily)
+    await reportHelpers.foo([Orders.rows], "Чайная Лавка",daily)
     res.status(200).send("OOOO")
 }
 
+// Генерация отчета товаров имеющихся в наличии
 
+async generateProductReport(req, res){
+    const req_body_tmp = req.body
+    console.log(req_body_tmp)
+    const product = await db.query(`select * from product where product_status = $1`, [1])
+
+    await reportHelpers.generationRepProduct(product.rows)
+    res.status(200).json({message: "Файл создан"})
+}
 
  
 
+/*
+async generateProductReportByPeriod(req, res) {
+    const { startDate, endDate } = req.body;
+  
+    try {
+      const result = await db.query(
+        `SELECT * FROM product WHERE product_status = $1 AND created_at BETWEEN $2 AND $3`,
+        [1, startDate, endDate]
+      );
+  
+      const fileName = await generationRepProductByPeriod(result.rows, startDate, endDate);
+      res.status(200).json({ message: "Файл создан", file: fileName });
+  
+    } catch (e) {
+      console.error(e);
+      res.status(400).json({ message: "Ошибка при создании отчета" });
+    }
+  }
+*/
 
+
+
+async generateReportByOrders(req, res){
+    const day = req.body
+    const daily = day["day"].split('.').reverse().join('-')
+
+
+}
 }
 
 module.exports = new adminController();

@@ -16,7 +16,7 @@ app.use('/api', adminRouter)
 
 
 
-app.listen(PORT, '0.0.0.0', ()=>console.log(PORT, `Server started on port ${PORT}`))
+app.listen(PORT, '0.0.0.0', ()=>console.log(`Server started on port ${PORT}`))
 
 
 
