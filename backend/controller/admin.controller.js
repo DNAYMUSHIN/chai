@@ -2,7 +2,6 @@
 
 const db = require('../db');
 const reportHelpers = require('./utils')
-
 const bcrypt = require('bcryptjs');
 const {ProductType} = require('../constants')
 const { time, error } = require('console');
@@ -41,7 +40,7 @@ async createAdmin(req, res){
         const admin_password = await bcrypt.hash(password, 10)
 
         const newAdmin = await db.query(
-            `INSERT INTO admin (admin_email, admin_password)
+            `INSERT INTO Admin (admin_email, admin_password)
             VALUES ($1, $2)
             RETURNING *`,
             [admin_email, admin_password]
@@ -54,29 +53,45 @@ async createAdmin(req, res){
     }
 }
 
-async enterAdmin(req, res){
-    //const randomNumber = Math.floor(Math.random() * 100);
-    //res.json({ number: randomNumber });
-
-
-
+async enterAdmin(req, res) {
     const {admin_email, password} = req.body;
-    const tmp_admin = await db.query(`select * from admin where admin_email = $1`, [admin_email]);
-    console.log(tmp_admin.rows[0])
-    if (tmp_admin.rows[0] == undefined){
-        return res.status(500).send("Администратор с такой почтой отсутсвует")
-    }
-    const password_with_table = tmp_admin.rows[0].admin_password
-    
-    const check = await bcrypt.compare(password, password_with_table)
-    if(check){
-        res.status(201).send("Вы вошли");
-    }
-    else{
-        res.status(404).send("Неправильный пароль");
-    }
-     
+    console.log(admin_email, password)
 
+    try{
+        const admin = await db.query(`SELECT * FROM admin 
+            WHERE admin_email = $1 and admin_password = $2`,
+        [admin_email, password])
+        if (admin.rows.length > 0) {  
+            console.log(admin.rows[0])
+            res.status(201).send(admin.rows[0])
+        }
+        else{
+            res.status(401).json({message: "Неправильный логин и пароль"})
+        }
+    }
+    catch(err){
+        console.log(err)
+        res.status(501).json({message: "Ошибка сервера"})
+    }
+    /*try {
+        const tmp_admin = await db.query(`select * from admin where admin_email = $1`, [admin_email]);
+        
+        if (!tmp_admin.rows[0]) {
+            return res.status(400).json({message:"Администратор с такой почтой отсутствует"});
+        }
+        
+        const password_with_table = tmp_admin.rows[0].admin_password;
+        const check = await bcrypt.compare(password, password_with_table);
+        
+        if(check) {
+            return res.status(200).json({ message: "Вы вошли"});
+        } else {
+            return res.status(401).json({message: "Неправильный пароль"});
+        }
+    } catch (error) {
+        console.error("Ошибка входа:", error);
+        return res.status(500).json({message:"Внутренняя ошибка сервера"});
+    }*/
 }
 
 
