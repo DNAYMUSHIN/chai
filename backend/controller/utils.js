@@ -1,5 +1,6 @@
 const ExcelJS = require('exceljs');
-
+const path = require('path');
+const fs = require('fs');
 
 async function convectorNumbersToWord(num){
     const units = ['', 'один', 'два', 'три', 'четыре', 'пять', 'шесть', 'семь', 'восемь', 'девять'];
@@ -84,8 +85,10 @@ async function getHundredsTensUnits(num, units, teens, tens, hundreds = null) {
 
 async function foo(products, buyer = 'ЧАЙНАЯ ЛАВКА', day) {
 
+    const data = new Date()
+    const d = data.toISOString().slice(0, 10).split('-').reverse().join(".")
     const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet(`Заказ`);
+    const worksheet = workbook.addWorksheet(`Отчет по продажам за ${d}`);
   
     // Настройка колонок
     worksheet.columns = [
@@ -99,7 +102,7 @@ async function foo(products, buyer = 'ЧАЙНАЯ ЛАВКА', day) {
   
     // Заголовок
     worksheet.mergeCells('A1:F1');
-    worksheet.getCell('A1').value = `Отчет за день - ${day}`;
+    worksheet.getCell('A1').value = `Отчет за день - ${d}`;
     worksheet.getCell('A1').font = { bold: true, size: 14 };
     worksheet.getCell('A1').alignment = { horizontal: 'center' };
   
@@ -134,8 +137,9 @@ async function foo(products, buyer = 'ЧАЙНАЯ ЛАВКА', day) {
     });
   
     // Заполнение данными из массива products
-    let totalSum = 0;
-    products.forEach((products, index) => {
+    fillingcell(worksheet, products)
+
+    /*products.forEach((products, index) => {
       // Определяем единицы измерения на основе типа товара
       const unit = products.status === 1 ? 'кг' : 'шт';
       
@@ -159,7 +163,7 @@ async function foo(products, buyer = 'ЧАЙНАЯ ЛАВКА', day) {
           right: { style: 'thin' }
         };
       });
-    });
+    });*/
   
     // Итоговая строка
     const totalRowNum = worksheet.rowCount + 1;
@@ -201,6 +205,67 @@ async function foo(products, buyer = 'ЧАЙНАЯ ЛАВКА', day) {
     console.log(`Файл "${fileName}" успешно создан!`);
     return fileName;
   }
-  
 
-module.exports = {foo}
+  async function generationRepProduct(product) {
+    const data = new Date()
+    const d = data.toISOString().slice(0, 10).split('-').reverse().join(".")
+    const workbook = new ExcelJS.Workbook()
+    const worksheet = workbook.addWorksheet(`Товары`);
+    worksheet.columns = [
+        { width: 5 },  // №
+        { width: 25 }, // Товар
+        { width: 15 }, // Кол-во
+        { width: 15 },  // Ед.
+        { width: 15 }, // Цена
+        { width: 15 }, // Сумма
+      ];
+    worksheet.mergeCells('B2:H2')
+    worksheet.getCell('B2').value = `Отчетность по имеющимся товарам за ${d}`
+    worksheet.insertRow(8, ["№", "Название товара", "Тип продукта", "Количество", "Цена", "Сумма"])
+    await fillingcell(worksheet, product)
+
+    const fileName = `Отчет_${d}.xlsx`;
+    await workbook.xlsx.writeFile(fileName);
+    return fileName;
+
+}
+
+
+
+async function fillingcell(worksheet, products) {
+    let totalSum = 0;
+    products.forEach((products, index) => {
+        // Определяем единицы измерения на основе типа товара
+        const unit = products.status === 1 ? 'кг' : 'шт';
+        
+        // Рассчитываем сумму для строки
+        const sum = products.price_unit * products.quantity;
+        totalSum += sum;
+        
+        const row = worksheet.addRow([
+          index + 1,
+          products.product_name,
+          unit,
+          products.quantity,
+          products.price_unit,
+          sum
+        ]);
+        
+        row.eachCell(cell => {
+          cell.border = {
+            top: { style: 'thin' },
+            left: { style: 'thin' },
+            bottom: { style: 'thin' },
+            right: { style: 'thin' }
+          };
+        });
+      });
+      return worksheet
+}
+
+
+
+
+
+
+module.exports = {foo, generationRepProduct}
