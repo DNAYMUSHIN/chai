@@ -1,0 +1,42 @@
+.products {
+    .workspace__header {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        grid-auto-rows: auto;
+        grid-template-areas: "excel add search" "features features features";
+        padding-bottom: 0.5rem;
+    }
+
+    .excel {
+        grid-area: excel;
+    }
+
+    .workspace__add-product {
+        grid-area: add;
+    }
+
+    .workspace__search {
+        grid-area: search;
+    }
+
+    .workspace__features {
+        grid-area: features;
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        text-align: center;
+    }
+
+    .order {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        padding: 0;
+        text-align: center;
+    }
+
+    .workspace__main {
+        padding: 0 1rem;
+    }
+}

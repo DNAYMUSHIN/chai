@@ -1,0 +1,37 @@
+.workspace {
+    display: grid;
+    grid-template-columns: 1fr;
+    /*grid-template-rows: 70px auto;*/
+    padding: 0.5rem 0;
+    width: 100%;
+}
+
+.workspace__header {
+    width: 100%;
+    display: flex;
+    gap: 2rem;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+    padding: 0 2rem;
+    position: sticky;
+    top: 0;
+    background-color: #fff;
+    z-index: 5;
+}
+
+.workspace__list {
+    display: flex;
+    flex-direction: column;
+    list-style: none;
+    margin: 0;
+    gap: 1rem;
+    padding: 1rem;
+}
+
+.workspace__item {
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    border-radius: 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 2rem;
+}

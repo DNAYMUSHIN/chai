@@ -40,7 +40,7 @@ async createAdmin(req, res){
         const admin_password = await bcrypt.hash(password, 10)
 
         const newAdmin = await db.query(
-            `INSERT INTO Admin (admin_email, admin_password)
+            `INSERT INTO admin (admin_email, admin_password)
             VALUES ($1, $2)
             RETURNING *`,
             [admin_email, admin_password]
@@ -93,6 +93,78 @@ async enterAdmin(req, res) {
         return res.status(500).json({message:"Внутренняя ошибка сервера"});
     }*/
 }
+
+/*------------------КАТЕГОРИИ--------------------*/
+async createCategory(req, res) {
+    try {
+        const { category_name } = req.body;
+
+        // Проверяем, что название категории передано
+        if (!category_name) {
+            return res.status(400).json({ message: "Название категории обязательно" });
+        }
+
+        // Вставляем новую категорию в БД
+        const newCategory = await db.query(
+            `INSERT INTO category (category_name)
+         VALUES ($1)
+         RETURNING *`,
+            [category_name]
+        );
+
+        // Возвращаем созданную категорию
+        res.status(201).json(newCategory.rows[0]);
+    } catch (e) {
+        console.error("Ошибка при создании категории:", e);
+        res.status(500).json({ message: "Ошибка при создании категории" });
+    }
+}
+
+async getAllCategories(req, res) {
+    try {
+        // Получаем все категории из БД
+        const categories = await db.query(
+            `SELECT * FROM category ORDER BY category_name ASC`
+        );
+
+        // Возвращаем список категорий
+        res.status(200).json(categories.rows);
+    } catch (e) {
+        console.error("Ошибка при получении категорий:", e);
+        res.status(500).json({ message: "Ошибка при получении списка категорий" });
+    }
+}
+
+    async deleteCategory(req, res) {
+        try {
+            const { id } = req.params; // Получаем ID категории из URL
+
+            // Проверяем существование категории
+            const categoryExists = await db.query(
+                `SELECT * FROM category WHERE category_id = $1`,
+                [id]
+            );
+
+            if (categoryExists.rows.length === 0) {
+                return res.status(404).json({ message: "Категория не найдена" });
+            }
+
+            // Удаляем категорию
+            await db.query(
+                `DELETE FROM category WHERE category_id = $1`,
+                [id]
+            );
+
+            res.status(200).json({ success: true, message: "Категория успешно удалена" });
+        } catch (e) {
+            console.error("Ошибка при удалении категории:", e);
+            res.status(500).json({ message: "Ошибка при удалении категории" });
+        }
+    }
+
+
+    /*------------------КАТЕГОРИИ (КОНЕЦ)--------------------*/
+
 
 
 async addProduct(req, res){

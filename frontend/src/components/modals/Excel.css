@@ -1,0 +1,36 @@
+.excel-popup {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-areas: "title exit"
+                    "button-all button-all"
+                    "button-need button-need"
+                    "button-have button-have";
+    gap: 1rem 0;
+}
+
+.excel-popup .title {
+    grid-area: title;
+}
+
+.excel-popup .exit {
+    grid-area: exit;
+}
+
+.excel-popup .button-all {
+    grid-area: button-all;
+    text-align: center;
+    -webkit-justify-content: start;
+    justify-content: start;
+}
+
+.excel-popup .button-need {
+    grid-area: button-need;
+    -webkit-justify-content: start;
+    justify-content: start;
+}
+
+.excel-popup .button-have {
+    grid-area: button-have;
+    -webkit-justify-content: start;
+    justify-content: start;
+}

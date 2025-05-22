@@ -26,6 +26,10 @@ router.post('/order/create', adminController.createOrder);
 // Route for generating sales reports
 router.get('/report', adminController.generateDailyReport);
 
+router.post('/categories', adminController.createCategory);
+router.get('/categories', adminController.getAllCategories);
+router.delete('/categories/:id', adminController.deleteCategory);
+
 // Route for creating an order via barcode scanning
 //router.post('/order/create-barcode', adminController.createOrderWithBarcode);
 
@@ -36,7 +40,7 @@ router.get('/report', adminController.generateDailyReport);
 
 // Route for generating sales reports
 
-router.post('/reportProduct', adminController.generateProductReport);
+//router.post('/reportProduct', adminController.generateProductReport);
 
 
 

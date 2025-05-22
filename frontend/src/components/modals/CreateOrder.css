@@ -1,0 +1,41 @@
+.popup__create-add-order {
+
+    .popup__header {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        grid-template-areas: "title close" "features features";
+    }
+
+    .popup__title{
+        grid-area: title;
+    }
+
+    .create-order__button-wrapper {
+        grid-area: close;
+        display: flex;
+        justify-content: end;
+    }
+
+    .features {
+        grid-area: features;
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        text-align: center;
+    }
+
+    .create-order__main-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+
+    .create-order__main-item {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        text-align: center;
+
+    }
+}

@@ -1,14 +1,13 @@
 import * as React from 'react';
-import Button from '@mui/material/Button';
 import CssBaseline from '@mui/material/CssBaseline';
-import {routes} from "./routes.js";
-import {RouterProvider} from "react-router-dom";
+import {BrowserRouter} from "react-router-dom";
+import AppRouter from "./components/AppRouter.jsx";
 
 export default function App() {
     return (
-        <React.Fragment>
+        <BrowserRouter>
             <CssBaseline />
-            <RouterProvider router={routes} />
-        </React.Fragment>
+            <AppRouter />
+        </BrowserRouter>
     );
 }

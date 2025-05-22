@@ -1,0 +1,9 @@
+.popup__create-add {
+    width: 100%;
+}
+
+.popup__create-add .popup__header{
+    display: flex;
+    width: 100%;
+    justify-content: space-between;
+}
