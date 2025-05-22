@@ -165,6 +165,32 @@ async getAllCategories(req, res) {
 
     /*------------------КАТЕГОРИИ (КОНЕЦ)--------------------*/
 
+// Все товары
+async getAllProduct(req, res){
+    try{
+        const products = await db.query(`SELECT * FROM Product`)
+        res.status(200).json(products.rows)
+    }
+    catch(err){
+        console.log("Ошибка при выводе товаров:", err)
+        res.status(500).json({message: "Ошибка на сервере при выводе товаров"})
+    }
+}
+
+// Имеющиеся или отсутствующие товары
+
+
+async getProductsByStatus(req, res){
+    const {status} = req.body
+    try{  
+        const products = await db.query(`SELECT * FROM Product WHERE product_status = $1`, [status])
+        res.status(200).json(products.rows)
+    }
+    catch(err){
+        console.log("Ошибка при выводе товаров:", err)
+        res.status(500).json({message: "Ошибка на сервере при выводе товаров"})
+    }
+}
 
 
 async addProduct(req, res){
@@ -273,9 +299,10 @@ async searchProduct(req, res)
     }
     
 }
+
+
+
 // Создание заказа через платформум 
-
-
 async createOrder(req, res){
     const {admin_id, product} = req.body
     let total = 0
