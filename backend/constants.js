@@ -3,3 +3,6 @@ const ProductType = Object.freeze({
   GRAMM: "гр" 
 });
 
+module.exports = {
+  ProductType
+};

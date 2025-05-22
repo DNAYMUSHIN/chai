@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import {Box, Button, FormControlLabel, Input, Modal, Radio, RadioGroup} from "@mui/material";
-import "./AddProduct.css"
+import { Box, Button, FormControlLabel, Input, Modal, Radio, RadioGroup } from "@mui/material";
+import "./AddProduct.css";
 
 const style = {
     position: 'absolute',
@@ -20,70 +20,125 @@ const AddProduct = (props) => {
     const [formData, setFormData] = useState({
         name: '',
         unitType: 'piece',
-        grams: '',
-        pricePer100g: '',
-        totalAmount: '',
-        price: '',
-        category: ''
+        grams: '100',
+        pricePer100g: '0',
+        totalAmount: '0',
+        price: '0',
+        category: '',
+        countMin: '0',
+        priceMin: '0',
+        code: ''
     });
 
-    // Если передан товар для редактирования, заполняем форму его данными
     useEffect(() => {
         if (props.product && props.type === 'change') {
+            // Парсим данные из продукта для формы
+            const isGramm = props.product.unit.includes('г');
+            const priceValue = props.product.price.replace(/[^\d.]/g, '');
+            const amountValue = props.product.amount.replace(/[^\d.]/g, '');
+
             setFormData({
                 name: props.product.name,
-                unitType: props.product.unit.includes('г') ? 'gramm' : 'piece',
-                grams: props.product.unit.replace(/\D/g, '') || '',
-                pricePer100g: props.product.price.replace(/\D/g, '') || '',
-                totalAmount: props.product.amount.replace(/\D/g, '') || '',
-                price: props.product.price,
-                category: props.product.category
+                unitType: isGramm ? 'gramm' : 'piece',
+                grams: isGramm ? props.product.unit.replace(/[^\d.]/g, '') : '100',
+                pricePer100g: isGramm ? priceValue : '0',
+                price: !isGramm ? priceValue : '0',
+                totalAmount: amountValue || '0',
+                category: props.product.category,
+                countMin: '0',
+                priceMin: '0',
+                code: ''
             });
         } else {
-            // Сброс формы при открытии для создания нового товара
             setFormData({
                 name: '',
                 unitType: 'piece',
-                grams: '',
-                pricePer100g: '',
-                totalAmount: '',
-                price: '',
-                category: ''
+                grams: '100',
+                pricePer100g: '0',
+                totalAmount: '0',
+                price: '0',
+                category: '',
+                countMin: '0',
+                priceMin: '0',
+                code: ''
             });
         }
     }, [props.product, props.type]);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
-        setFormData(prev => ({
-            ...prev,
-            [name]: value
-        }));
+        // Для числовых полей проверяем, что значение - число или пустая строка
+        const numericFields = ['grams', 'pricePer100g', 'totalAmount', 'price', 'countMin', 'priceMin'];
+
+        if (numericFields.includes(name)) {
+            // Разрешаем только числа и точку для десятичных
+            const validatedValue = value === '' ? '' : value.replace(/[^0-9.]/g, '');
+            setFormData(prev => ({
+                ...prev,
+                [name]: validatedValue
+            }));
+        } else {
+            setFormData(prev => ({
+                ...prev,
+                [name]: value
+            }));
+        }
     };
 
     const handleSubmit = (e) => {
         e.preventDefault();
 
-        // Форматируем данные перед отправкой
-        const productData = {
+        // Преобразуем все числовые значения
+        const numericData = {
+            grams: parseFloat(formData.grams) || 0,
+            pricePer100g: parseFloat(formData.pricePer100g) || 0,
+            totalAmount: parseFloat(formData.totalAmount) || 0,
+            price: parseFloat(formData.price) || 0,
+            countMin: parseInt(formData.countMin) || 0,
+            priceMin: parseFloat(formData.priceMin) || 0
+        };
+
+        // Формируем данные для бэкенда
+        const backendData = {
+            product_name: formData.name,
+            product_category: formData.category,
+            product_type: formData.unitType === 'piece' ? "шт" : "гр",
+            product_price_unit: formData.unitType === 'piece' ? numericData.price : numericData.pricePer100g,
+            quinity: numericData.totalAmount,
+            product_count_min: numericData.countMin,
+            product_price_min: numericData.priceMin,
+            product_code: formData.code || null, // Отправляем null если код пустой
+        };
+
+        // Формируем данные для отображения на фронтенде
+        const frontendData = {
             name: formData.name,
-            status: 'В наличии', // Можно сделать выбор статуса в форме
+            status: 'В наличии',
             price: formData.unitType === 'piece'
-                ? `${formData.price} руб.`
-                : `${formData.pricePer100g} руб. за 100г`,
+                ? `${numericData.price} руб.`
+                : `${numericData.pricePer100g} руб. за 100г`,
             unit: formData.unitType === 'piece'
                 ? '1 шт.'
-                : `${formData.grams} г`,
+                : `${numericData.grams} г`,
             amount: formData.unitType === 'piece'
-                ? `${formData.totalAmount} шт.`
-                : `${formData.totalAmount} г`,
-            category: formData.category
+                ? `${numericData.totalAmount} шт.`
+                : `${numericData.totalAmount} г`,
+            category: formData.category,
+            countMin: numericData.countMin,
+            priceMin: numericData.priceMin,
+            code: formData.code
         };
 
         if (props.type === 'add') {
-            props.onAdd(productData);
+            props.onAdd(backendData, frontendData);
         } else {
-            props.onUpdate({ ...productData, id: props.product.id });
+            props.onUpdate({
+                ...backendData,
+                id: props.product.id
+            }, {
+                ...frontendData,
+                id: props.product.id
+            });
         }
 
         props.handleClose();
@@ -96,7 +151,7 @@ const AddProduct = (props) => {
             aria-labelledby="child-modal-title"
             aria-describedby="child-modal-description"
         >
-            <Box sx={{...style, width: "80vw"}} className="popup__create-add">
+            <Box sx={{ ...style, width: "80vw" }} className="popup__create-add">
                 <div className="popup__header">
                     <div className="popup__title">
                         {props.type === "add" ?
@@ -167,12 +222,13 @@ const AddProduct = (props) => {
                                             Количество грамм
                                             <Input
                                                 placeholder="100"
-                                                type="number"
+                                                type="text"
                                                 name="grams"
                                                 id="grams"
                                                 className="gramm"
                                                 value={formData.grams}
                                                 onChange={handleChange}
+                                                inputProps={{ inputMode: 'numeric', pattern: '[0-9.]*' }}
                                             />
                                         </p>
                                     </div>
@@ -181,12 +237,13 @@ const AddProduct = (props) => {
                                             Цена за <span className="price-gramm">100</span> грамм
                                             <Input
                                                 placeholder="0"
-                                                type="number"
+                                                type="text"
                                                 name="pricePer100g"
                                                 id="pricePer100g"
                                                 className="price-gramm"
                                                 value={formData.pricePer100g}
                                                 onChange={handleChange}
+                                                inputProps={{ inputMode: 'numeric', pattern: '[0-9.]*' }}
                                             />
                                             рублей
                                         </p>
@@ -200,12 +257,13 @@ const AddProduct = (props) => {
                                         Цена за штуку
                                         <Input
                                             placeholder="0"
-                                            type="number"
+                                            type="text"
                                             name="price"
                                             id="price"
                                             className="price-gramm"
                                             value={formData.price}
                                             onChange={handleChange}
+                                            inputProps={{ inputMode: 'numeric', pattern: '[0-9.]*' }}
                                         />
                                         рублей
                                     </p>
@@ -219,18 +277,20 @@ const AddProduct = (props) => {
                                 <p className="create__gramm-text">
                                     <Input
                                         placeholder="0"
-                                        type="number"
+                                        type="text"
                                         name="totalAmount"
                                         id="totalAmount"
                                         className="price-gramm"
                                         value={formData.totalAmount}
                                         onChange={handleChange}
                                         required
+                                        inputProps={{ inputMode: 'numeric', pattern: '[0-9.]*' }}
                                     />
                                     {formData.unitType === 'piece' ? 'штук' : 'грамм'}
                                 </p>
                             </div>
                         </div>
+
 
                         <div className="button-create-wrapper">
                             <Button

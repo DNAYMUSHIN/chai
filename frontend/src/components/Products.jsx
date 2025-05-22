@@ -4,45 +4,7 @@ import "./Products.css";
 import Excel from "./modals/Excel.jsx";
 import AddProduct from "./modals/AddProduct.jsx";
 
-// Заглушка для имитации API товаров
-const fetchProducts = async () => {
-    return new Promise((resolve) => {
-        setTimeout(() => {
-            resolve({
-                success: true,
-                data: [
-                    {
-                        id: 1,
-                        name: 'Конфета "Три медвежонка в сосновом бору"',
-                        status: 'В работе',
-                        price: '10 руб.',
-                        unit: '1 шт.',
-                        amount: '1 шт.',
-                        category: 'Конфеты'
-                    },
-                    {
-                        id: 2,
-                        name: 'Зеленый чай "Жасминовый"',
-                        status: 'В наличии',
-                        price: '250 руб.',
-                        unit: '100 г',
-                        amount: '15 упак.',
-                        category: 'Зеленый чай'
-                    },
-                    {
-                        id: 3,
-                        name: 'Кофе "Эспрессо Премиум"',
-                        status: 'Нет в наличии',
-                        price: '350 руб.',
-                        unit: '250 г',
-                        amount: '0 упак.',
-                        category: 'Кофе'
-                    }
-                ]
-            });
-        }, 500);
-    });
-};
+const API_URL = '/api/product'; // Ваш API endpoint
 
 const Products = () => {
     const [products, setProducts] = useState([]);
@@ -54,28 +16,38 @@ const Products = () => {
     const [productActionType, setProductActionType] = useState('add');
     const [selectedProduct, setSelectedProduct] = useState(null);
 
-
-
     // Загрузка товаров
-    useEffect(() => {
-        const loadProducts = async () => {
-            setLoading(true);
-            try {
-                const response = await fetchProducts();
-                if (response.success) {
-                    setProducts(response.data);
-                } else {
-                    setError("Не удалось загрузить товары");
-                }
-            } catch (err) {
-                setError("Ошибка при загрузке товаров");
-                console.error(err);
-            } finally {
-                setLoading(false);
+    const fetchProducts = async () => {
+        setLoading(true);
+        try {
+            const response = await fetch(API_URL);
+            if (!response.ok) {
+                throw new Error("Не удалось загрузить товары");
             }
-        };
+            const data = await response.json();
 
-        loadProducts();
+            // Преобразуем данные из бэкенда в нужный формат
+            const formattedProducts = data.map(product => ({
+                id: product.product_id,
+                name: product.product_name,
+                status: product.product_status === 1 ? 'В наличии' : 'Нет в наличии',
+                price: `${product.price_unit} руб.${product.product_type === 2 ? ' за 100г' : ''}`,
+                unit: product.product_type === 1 ? '1 шт.' : `${product.quantity} г`,
+                amount: `${product.quantity} ${product.product_type === 1 ? 'шт.' : 'г'}`,
+                category: product.category_name || 'Без категории'
+            }));
+
+            setProducts(formattedProducts);
+        } catch (err) {
+            setError(err.message || "Ошибка при загрузке товаров");
+            console.error(err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchProducts();
     }, []);
 
     // Фильтрация товаров по поисковому запросу
@@ -96,27 +68,76 @@ const Products = () => {
         setOpenAddProduct(true);
     };
 
-    const handleAddProduct = (newProduct) => {
-        // В реальном приложении здесь будет вызов API
-        setProducts(prev => [...prev, {
-            ...newProduct,
-            id: Date.now(),
-            status: 'В наличии' // Добавляем статус по умолчанию
-        }]);
+    const handleAddProduct = async (backendData, frontendData) => {
+        try {
+            const response = await fetch(`${API_URL}/add`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(backendData)
+            });
+
+            if (!response.ok) {
+                throw new Error("Ошибка при добавлении товара");
+            }
+
+            const data = await response.json();
+            setProducts(prev => [...prev, {
+                ...frontendData,
+                id: data.product.product_id
+            }]);
+        } catch (err) {
+            console.error('Ошибка при добавлении товара:', err);
+        }
     };
 
-    const handleUpdateProduct = (updatedProduct) => {
-        // В реальном приложении здесь будет вызов API
-        setProducts(prev =>
-            prev.map(product =>
-                product.id === updatedProduct.id ? updatedProduct : product
-            )
-        );
+    const handleUpdateProduct = async (updatedProduct) => {
+        try {
+            const response = await fetch(`${API_URL}/update`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    product_id: updatedProduct.id,
+                    field: 'product_name',
+                    value: updatedProduct.name
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error("Ошибка при обновлении товара");
+            }
+
+            setProducts(prev =>
+                prev.map(product =>
+                    product.id === updatedProduct.id ? updatedProduct : product
+                )
+            );
+        } catch (err) {
+            console.error('Ошибка при обновлении товара:', err);
+        }
     };
 
-    const handleDeleteProduct = (productId) => {
-        // В реальном приложении здесь будет вызов API
-        setProducts(prev => prev.filter(product => product.id !== productId));
+    const handleDeleteProduct = async (productId) => {
+        try {
+            const response = await fetch(`${API_URL}/delete`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ product_id: productId })
+            });
+
+            if (!response.ok) {
+                throw new Error("Ошибка при удалении товара");
+            }
+
+            setProducts(prev => prev.filter(product => product.id !== productId));
+        } catch (err) {
+            console.error('Ошибка при удалении товара:', err);
+        }
     };
 
     return (
@@ -131,6 +152,7 @@ const Products = () => {
                 onUpdate={handleUpdateProduct}
             />
 
+            {/* Остальная часть JSX остается без изменений */}
             <div className="workspace__header">
                 <Button onClick={() => setOpenExcel(true)} className="excel">
                     Выгрузить в Excel

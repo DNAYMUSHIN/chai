@@ -169,7 +169,7 @@ async getAllCategories(req, res) {
 
 async addProduct(req, res){
     const {product_category, product_name, product_type, product_price_unit, quinity, product_count_min, product_price_min, product_code} = req.body;
-    let type = product_type == ProductType.PIECE ? type = 1: type = 2
+    let type = product_type === ProductType.PIECE ? 1 : 2
     
     if (!product_name || !product_category || product_price_unit == undefined || quinity == undefined)
     {
