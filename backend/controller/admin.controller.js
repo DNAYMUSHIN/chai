@@ -247,18 +247,27 @@ async addProduct(req, res){
     }
 }
 
-// Изменение
-async updateProduct(req, res){
-
-    const {product_id, field, value} = req.body();
-    if (!product_id || !field || value === undefined) {
-        return res.status(400).json({ error: 'Некорректные данные' });
-    }
+async updateProduct(req, res) {
+    const { product_id, field, value } = req.body;
 
     try {
+        // Если обновляется категория - сначала находим её ID
+        if (field === 'product_category') {
+            const categoryQuery = 'SELECT category_id FROM Categories WHERE category_name = $1';
+            const categoryResult = await db.query(categoryQuery, [value]);
+
+            if (categoryResult.rows.length === 0) {
+                return res.status(400).json({ error: 'Категория не найдена' });
+            }
+
+            const updateQuery = `UPDATE Product SET product_category_id = $1 WHERE product_id = $2 RETURNING *`;
+            const updatedProduct = await db.query(updateQuery, [categoryResult.rows[0].category_id, product_id]);
+            return res.status(200).json({ message: 'Товар обновлен', product: updatedProduct.rows[0] });
+        }
+
+        // Для остальных полей
         const updateQuery = `UPDATE Product SET ${field} = $1 WHERE product_id = $2 RETURNING *`;
         const updatedProduct = await db.query(updateQuery, [value, product_id]);
-
         res.status(200).json({ message: 'Товар обновлен', product: updatedProduct.rows[0] });
     } catch (err) {
         console.error('Ошибка обновления товара:', err);
@@ -269,6 +278,8 @@ async updateProduct(req, res){
 // Удаление товара из БД
 async deleteProduct(req, res) {
     const {product_id} = req.body;
+
+    console.log('Запрос на удаление получен', req.body); // Добавьте это
 
     if (!product_id) {
         return res.status(400).json({ error: 'Некорректные данные' });

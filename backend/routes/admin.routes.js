@@ -16,6 +16,7 @@ router.put('/product/update', adminController.updateProduct);
 
 router.get('/product/get', adminController.getAllProduct);
 
+router.post('/product/status', adminController.getProductsByStatus);
 
 // Route for deleting a product
 router.delete('/product/delete', adminController.deleteProduct);

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Button, FormControlLabel, Input, Modal, Radio, RadioGroup } from "@mui/material";
+import { Box, Button, FormControlLabel, Input, Modal, Radio, RadioGroup, MenuItem, Select, FormControl, InputLabel } from "@mui/material";
 import "./AddProduct.css";
 
 const style = {
@@ -7,138 +7,146 @@ const style = {
     top: '50%',
     left: '50%',
     transform: 'translate(-50%, -50%)',
-    width: 400,
+    width: '80vw',
+    maxHeight: '90vh',
     bgcolor: 'background.paper',
     borderRadius: '2rem',
     boxShadow: 24,
     pt: 2,
     px: 4,
     pb: 3,
+    overflowY: 'auto',
 };
 
 const AddProduct = (props) => {
     const [formData, setFormData] = useState({
-        name: '',
-        unitType: 'piece',
-        grams: '100',
-        pricePer100g: '0',
-        totalAmount: '0',
-        price: '0',
-        category: '',
-        countMin: '0',
-        priceMin: '0',
-        code: ''
+        product_name: '',
+        product_category_id: '',
+        product_type: 'шт',
+        product_price_unit: '0',
+        quinity: '0',
+        product_count_min: '0',
+        product_price_min: '0',
+        product_code: ''
     });
 
-    useEffect(() => {
-        if (props.product && props.type === 'change') {
-            // Парсим данные из продукта для формы
-            const isGramm = props.product.unit.includes('г');
-            const priceValue = props.product.price.replace(/[^\d.]/g, '');
-            const amountValue = props.product.amount.replace(/[^\d.]/g, '');
+    const [categories, setCategories] = useState([]);
+    const [loadingCategories, setLoadingCategories] = useState(false);
 
+    // Загрузка категорий при монтировании
+    useEffect(() => {
+        const fetchCategories = async () => {
+            setLoadingCategories(true);
+            try {
+                const response = await fetch('/api/categories');
+                const data = await response.json();
+                setCategories(data);
+            } catch (error) {
+                console.error('Ошибка загрузки категорий:', error);
+            } finally {
+                setLoadingCategories(false);
+            }
+        };
+
+        fetchCategories();
+    }, []);
+
+    // Инициализация формы при редактировании
+    useEffect(() => {
+        if (props.product && props.type === 'edit') {
+            const product = props.product.rawData;
             setFormData({
-                name: props.product.name,
-                unitType: isGramm ? 'gramm' : 'piece',
-                grams: isGramm ? props.product.unit.replace(/[^\d.]/g, '') : '100',
-                pricePer100g: isGramm ? priceValue : '0',
-                price: !isGramm ? priceValue : '0',
-                totalAmount: amountValue || '0',
-                category: props.product.category,
-                countMin: '0',
-                priceMin: '0',
-                code: ''
+                product_name: product.product_name,
+                product_category_id: product.product_category_id?.toString() || '',
+                product_type: product.product_type === 1 ? 'шт' : 'гр',
+                product_price_unit: product.price_unit.toString(),
+                quinity: product.quantity.toString(),
+                product_count_min: product.product_count_min?.toString() || '0',
+                product_price_min: product.product_price_min?.toString() || '0',
+                product_code: product.product_code || ''
             });
         } else {
             setFormData({
-                name: '',
-                unitType: 'piece',
-                grams: '100',
-                pricePer100g: '0',
-                totalAmount: '0',
-                price: '0',
-                category: '',
-                countMin: '0',
-                priceMin: '0',
-                code: ''
+                product_name: '',
+                product_category_id: '',
+                product_type: 'шт',
+                product_price_unit: '0',
+                quinity: '0',
+                product_count_min: '0',
+                product_price_min: '0',
+                product_code: ''
             });
         }
     }, [props.product, props.type]);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
-        // Для числовых полей проверяем, что значение - число или пустая строка
-        const numericFields = ['grams', 'pricePer100g', 'totalAmount', 'price', 'countMin', 'priceMin'];
+        const numericFields = [
+            'product_price_unit',
+            'quinity',
+            'product_count_min',
+            'product_price_min'
+        ];
 
         if (numericFields.includes(name)) {
-            // Разрешаем только числа и точку для десятичных
             const validatedValue = value === '' ? '' : value.replace(/[^0-9.]/g, '');
-            setFormData(prev => ({
-                ...prev,
-                [name]: validatedValue
-            }));
+            setFormData(prev => ({ ...prev, [name]: validatedValue }));
         } else {
-            setFormData(prev => ({
-                ...prev,
-                [name]: value
-            }));
+            setFormData(prev => ({ ...prev, [name]: value }));
         }
+    };
+
+    const handleTypeChange = (e) => {
+        const type = e.target.value;
+        setFormData(prev => ({
+            ...prev,
+            product_type: type,
+            product_price_unit: '0'
+        }));
     };
 
     const handleSubmit = (e) => {
         e.preventDefault();
 
-        // Преобразуем все числовые значения
-        const numericData = {
-            grams: parseFloat(formData.grams) || 0,
-            pricePer100g: parseFloat(formData.pricePer100g) || 0,
-            totalAmount: parseFloat(formData.totalAmount) || 0,
-            price: parseFloat(formData.price) || 0,
-            countMin: parseInt(formData.countMin) || 0,
-            priceMin: parseFloat(formData.priceMin) || 0
-        };
-
-        // Формируем данные для бэкенда
-        const backendData = {
-            product_name: formData.name,
-            product_category: formData.category,
-            product_type: formData.unitType === 'piece' ? "шт" : "гр",
-            product_price_unit: formData.unitType === 'piece' ? numericData.price : numericData.pricePer100g,
-            quinity: numericData.totalAmount,
-            product_count_min: numericData.countMin,
-            product_price_min: numericData.priceMin,
-            product_code: formData.code || null, // Отправляем null если код пустой
-        };
-
-        // Формируем данные для отображения на фронтенде
-        const frontendData = {
-            name: formData.name,
-            status: 'В наличии',
-            price: formData.unitType === 'piece'
-                ? `${numericData.price} руб.`
-                : `${numericData.pricePer100g} руб. за 100г`,
-            unit: formData.unitType === 'piece'
-                ? '1 шт.'
-                : `${numericData.grams} г`,
-            amount: formData.unitType === 'piece'
-                ? `${numericData.totalAmount} шт.`
-                : `${numericData.totalAmount} г`,
-            category: formData.category,
-            countMin: numericData.countMin,
-            priceMin: numericData.priceMin,
-            code: formData.code
-        };
+        // Находим название категории по ID
+        const selectedCategory = categories.find(c => c.category_id.toString() === formData.product_category_id);
+        const categoryName = selectedCategory ? selectedCategory.category_name : '';
 
         if (props.type === 'add') {
-            props.onAdd(backendData, frontendData);
+            // Логика для добавления (оставляем как есть)
+            const submissionData = {
+                product_name: formData.product_name,
+                product_category: categoryName,
+                product_type: formData.product_type === 'шт' ? 1 : 2,
+                product_price_unit: parseFloat(formData.product_price_unit) || 0,
+                quinity: parseFloat(formData.quinity) || 0,
+                product_count_min: parseFloat(formData.product_count_min) || 0,
+                product_price_min: parseFloat(formData.product_price_min) || 0,
+                product_code: parseInt(formData.product_code || '')
+            };
+            props.onAdd(submissionData);
         } else {
-            props.onUpdate({
-                ...backendData,
-                id: props.product.id
-            }, {
-                ...frontendData,
-                id: props.product.id
-            });
+            // Логика для редактирования
+            const originalProduct = props.product.rawData;
+            const updates = {};
+
+            // Проверяем каждое поле на изменения
+            if (formData.product_name !== originalProduct.product_name)
+                updates.product_name = formData.product_name;
+
+            if (formData.product_category_id !== originalProduct.product_category_id?.toString())
+                updates.product_category = categoryName; // Отправляем название категории
+
+            if ((formData.product_type === 'шт' ? 1 : 2) !== originalProduct.product_type)
+                updates.product_type = formData.product_type === 'шт' ? 1 : 2;
+
+            if (parseFloat(formData.product_price_unit) !== originalProduct.price_unit)
+                updates.price_unit = parseFloat(formData.product_price_unit) || 0;
+
+            if (parseFloat(formData.quinity) !== originalProduct.quantity)
+                updates.quantity = parseFloat(formData.quinity) || 0;
+
+            props.onUpdate(updates);
         }
 
         props.handleClose();
@@ -151,7 +159,7 @@ const AddProduct = (props) => {
             aria-labelledby="child-modal-title"
             aria-describedby="child-modal-description"
         >
-            <Box sx={{ ...style, width: "80vw" }} className="popup__create-add">
+            <Box sx={{ ...style }} className="popup__create-add">
                 <div className="popup__header">
                     <div className="popup__title">
                         {props.type === "add" ?
@@ -167,7 +175,7 @@ const AddProduct = (props) => {
                         </Button>
                     </div>
                 </div>
-                <div className="popup__main">
+                <div className="popup__main" style={{ maxHeight: 'calc(90vh - 120px)', overflowY: 'auto' }}>
                     <form className="create__form" onSubmit={handleSubmit}>
                         <h2 className="create__title">Наименование:</h2>
                         <div className="create__form-inner-wrapper">
@@ -175,10 +183,9 @@ const AddProduct = (props) => {
                                 <Input
                                     placeholder="Название товара"
                                     type="text"
-                                    name="name"
-                                    id="name"
+                                    name="product_name"
                                     className="search"
-                                    value={formData.name}
+                                    value={formData.product_name}
                                     onChange={handleChange}
                                     required
                                 />
@@ -187,18 +194,27 @@ const AddProduct = (props) => {
 
                         <h2 className="create__title">Категория:</h2>
                         <div className="create__form-inner-wrapper">
-                            <div className="search-wrapper">
-                                <Input
-                                    placeholder="Категория товара"
-                                    type="text"
-                                    name="category"
-                                    id="category"
-                                    className="search"
-                                    value={formData.category}
+                            <FormControl fullWidth>
+                                <InputLabel id="category-select-label">Категория</InputLabel>
+                                <Select
+                                    labelId="category-select-label"
+                                    name="product_category_id"
+                                    value={formData.product_category_id}
                                     onChange={handleChange}
                                     required
-                                />
-                            </div>
+                                    disabled={loadingCategories}
+                                >
+                                    <MenuItem value="">Выберите категорию</MenuItem>
+                                    {categories.map(category => (
+                                        <MenuItem
+                                            key={category.category_id}
+                                            value={category.category_id}
+                                        >
+                                            {category.category_name}
+                                        </MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
                         </div>
 
                         <h2 className="create__title">В чем измеряется:</h2>
@@ -206,69 +222,31 @@ const AddProduct = (props) => {
                             <div className="create__radio-wrapper">
                                 <RadioGroup
                                     aria-labelledby="unit-type-group"
-                                    name="unitType"
-                                    value={formData.unitType}
-                                    onChange={handleChange}
+                                    name="product_type"
+                                    value={formData.product_type}
+                                    onChange={handleTypeChange}
                                 >
-                                    <FormControlLabel value="piece" control={<Radio />} label="Штука" />
-                                    <FormControlLabel value="gramm" control={<Radio />} label="Граммы" />
+                                    <FormControlLabel value="шт" control={<Radio />} label="Штука" />
+                                    <FormControlLabel value="гр" control={<Radio />} label="Граммы" />
                                 </RadioGroup>
                             </div>
 
-                            {formData.unitType === 'gramm' && (
-                                <>
-                                    <div className="create__gramm">
-                                        <p className="create__gramm-text">
-                                            Количество грамм
-                                            <Input
-                                                placeholder="100"
-                                                type="text"
-                                                name="grams"
-                                                id="grams"
-                                                className="gramm"
-                                                value={formData.grams}
-                                                onChange={handleChange}
-                                                inputProps={{ inputMode: 'numeric', pattern: '[0-9.]*' }}
-                                            />
-                                        </p>
-                                    </div>
-                                    <div className="create__gramm-price">
-                                        <p className="create__gramm-text">
-                                            Цена за <span className="price-gramm">100</span> грамм
-                                            <Input
-                                                placeholder="0"
-                                                type="text"
-                                                name="pricePer100g"
-                                                id="pricePer100g"
-                                                className="price-gramm"
-                                                value={formData.pricePer100g}
-                                                onChange={handleChange}
-                                                inputProps={{ inputMode: 'numeric', pattern: '[0-9.]*' }}
-                                            />
-                                            рублей
-                                        </p>
-                                    </div>
-                                </>
-                            )}
-
-                            {formData.unitType === 'piece' && (
-                                <div className="create__gramm-price">
-                                    <p className="create__gramm-text">
-                                        Цена за штуку
-                                        <Input
-                                            placeholder="0"
-                                            type="text"
-                                            name="price"
-                                            id="price"
-                                            className="price-gramm"
-                                            value={formData.price}
-                                            onChange={handleChange}
-                                            inputProps={{ inputMode: 'numeric', pattern: '[0-9.]*' }}
-                                        />
-                                        рублей
-                                    </p>
-                                </div>
-                            )}
+                            <div className="create__gramm-price">
+                                <p className="create__gramm-text">
+                                    Цена за {formData.product_type === 'шт' ? 'штуку' : '100 грамм'}
+                                    <Input
+                                        placeholder="0"
+                                        type="text"
+                                        name="product_price_unit"
+                                        className="price-gramm"
+                                        value={formData.product_price_unit}
+                                        onChange={handleChange}
+                                        inputProps={{ inputMode: 'numeric', pattern: '[0-9.]*' }}
+                                        required
+                                    />
+                                    рублей
+                                </p>
+                            </div>
                         </div>
 
                         <h2 className="create__title">Общее количество товара:</h2>
@@ -278,19 +256,43 @@ const AddProduct = (props) => {
                                     <Input
                                         placeholder="0"
                                         type="text"
-                                        name="totalAmount"
-                                        id="totalAmount"
+                                        name="quinity"
                                         className="price-gramm"
-                                        value={formData.totalAmount}
+                                        value={formData.quinity}
                                         onChange={handleChange}
                                         required
                                         inputProps={{ inputMode: 'numeric', pattern: '[0-9.]*' }}
                                     />
-                                    {formData.unitType === 'piece' ? 'штук' : 'грамм'}
+                                    {formData.product_type === 'шт' ? 'штук' : 'грамм'}
                                 </p>
                             </div>
                         </div>
 
+                        <h2 className="create__title">Минимальное количество:</h2>
+                        <div className="create__form-inner-wrapper">
+                            <Input
+                                placeholder="0"
+                                type="text"
+                                name="product_count_min"
+                                className="search"
+                                value={formData.product_count_min}
+                                onChange={handleChange}
+                                inputProps={{ inputMode: 'numeric', pattern: '[0-9.]*' }}
+                            />
+                        </div>
+
+                        <h2 className="create__title">Минимальная цена:</h2>
+                        <div className="create__form-inner-wrapper">
+                            <Input
+                                placeholder="0"
+                                type="text"
+                                name="product_price_min"
+                                className="search"
+                                value={formData.product_price_min}
+                                onChange={handleChange}
+                                inputProps={{ inputMode: 'numeric', pattern: '[0-9.]*' }}
+                            />
+                        </div>
 
                         <div className="button-create-wrapper">
                             <Button

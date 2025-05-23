@@ -4,10 +4,21 @@ import "./Products.css";
 import Excel from "./modals/Excel.jsx";
 import AddProduct from "./modals/AddProduct.jsx";
 
-const API_URL = '/api/product'; // Ваш API endpoint
+const API_URL_MAIN = "/api/product/";
+const API_CATEGORIES = "/api/categories";
+
+const API_URL = {
+    getAll: `${API_URL_MAIN}get`,
+    getByStatus: `${API_URL_MAIN}status`,
+    add: `${API_URL_MAIN}add`,
+    update: `${API_URL_MAIN}update`,
+    delete: `${API_URL_MAIN}delete`,
+    search: `${API_URL_MAIN}p`
+};
 
 const Products = () => {
     const [products, setProducts] = useState([]);
+    const [categories, setCategories] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
@@ -16,46 +27,134 @@ const Products = () => {
     const [productActionType, setProductActionType] = useState('add');
     const [selectedProduct, setSelectedProduct] = useState(null);
 
+    // Загрузка категорий
+    const fetchCategories = async () => {
+        try {
+            const response = await fetch(API_CATEGORIES);
+            if (!response.ok) throw new Error('Ошибка загрузки категорий');
+            const data = await response.json();
+            setCategories(data);
+        } catch (err) {
+            console.error("Ошибка при загрузке категорий:", err);
+        }
+    };
+
+
     // Загрузка товаров
     const fetchProducts = async () => {
         setLoading(true);
+        setError(null);
         try {
-            const response = await fetch(API_URL);
-            if (!response.ok) {
-                throw new Error("Не удалось загрузить товары");
-            }
-            const data = await response.json();
+            // Загружаем категории, если еще не загружены
+           /* if (categories.length === 0) {
+                await fetchCategories();
+            }*/
 
-            // Преобразуем данные из бэкенда в нужный формат
-            const formattedProducts = data.map(product => ({
-                id: product.product_id,
-                name: product.product_name,
-                status: product.product_status === 1 ? 'В наличии' : 'Нет в наличии',
-                price: `${product.price_unit} руб.${product.product_type === 2 ? ' за 100г' : ''}`,
-                unit: product.product_type === 1 ? '1 шт.' : `${product.quantity} г`,
-                amount: `${product.quantity} ${product.product_type === 1 ? 'шт.' : 'г'}`,
-                category: product.category_name || 'Без категории'
-            }));
+            const response = await fetch(API_URL.getAll);
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
+            const data = await response.json();
+            const formattedProducts = data.map(product => {
+                // Находим название категории по ID
+                const category = categories.find(c => c.category_id === product.product_category_id);
+
+
+                return {
+                    id: product.product_id,
+                    name: product.product_name,
+                    status: product.product_status === 1 ? 'В наличии' : 'Нет в наличии',
+                    price: `${product.price_unit} руб.${product.product_type === 2 ? ' за 100г' : ''}`,
+                    unit: product.product_type === 1 ? '1 шт.' : `${product.quantity} г`,
+                    amount: `${product.quantity} ${product.product_type === 1 ? 'шт.' : 'г'}`,
+                    category: category ? category.category_name : 'Без категории',
+                    rawData: product
+                };
+            });
 
             setProducts(formattedProducts);
         } catch (err) {
-            setError(err.message || "Ошибка при загрузке товаров");
-            console.error(err);
+            console.error("Ошибка при загрузке товаров:", err);
+            setError("Не удалось загрузить товары. Попробуйте позже.");
         } finally {
             setLoading(false);
         }
     };
 
+   /* useEffect(() => {
+        fetchCategories().then(() => {
+                console.log(categories);
+                fetchProducts();
+            }
+        );
+    }, []);*/
+
+
+
     useEffect(() => {
-        fetchProducts();
+        const loadData = async () => {
+            try {
+                setLoading(true);
+                // Сначала загружаем категории
+                const categoriesResponse = await fetch(API_CATEGORIES);
+                if (!categoriesResponse.ok) throw new Error('Ошибка загрузки категорий');
+                const categoriesData = await categoriesResponse.json();
+                setCategories(categoriesData);
+
+                // Затем загружаем товары
+                const productsResponse = await fetch(API_URL.getAll);
+                if (!productsResponse.ok) throw new Error(`HTTP error! status: ${productsResponse.status}`);
+                const productsData = await productsResponse.json();
+
+                // Форматируем товары с учетом загруженных категорий
+                const formattedProducts = productsData.map(product => {
+                    const category = categoriesData.find(c => c.category_id === product.product_category_id);
+                    return {
+                        id: product.product_id,
+                        name: product.product_name,
+                        status: product.product_status === 1 ? 'В наличии' : 'Нет в наличии',
+                        price: `${product.price_unit} руб.${product.product_type === 2 ? ' за 100г' : ''}`,
+                        unit: product.product_type === 1 ? '1 шт.' : `${product.quantity} г`,
+                        amount: `${product.quantity} ${product.product_type === 1 ? 'шт.' : 'г'}`,
+                        category: category ? category.category_name : 'Без категории',
+                        rawData: product
+                    };
+                });
+
+                setProducts(formattedProducts);
+            } catch (err) {
+                console.error("Ошибка при загрузке данных:", err);
+                setError("Не удалось загрузить данные. Попробуйте позже.");
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        loadData();
     }, []);
 
-    // Фильтрация товаров по поисковому запросу
+
+
+    // Обновляем товары при изменении категорий
+    useEffect(() => {
+        if (categories.length > 0 && products.length > 0) {
+            const updatedProducts = products.map(product => {
+                const category = categories.find(c => c.category_id === product.rawData.product_category_id);
+                return {
+                    ...product,
+                    category: category ? category.category_name : 'Без категории'
+                };
+            });
+            setProducts(updatedProducts);
+        }
+    }, [categories]);
+
+    // Фильтрация товаров
     const filteredProducts = products.filter(product =>
         product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         product.category.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
+    // Остальные методы остаются без изменений
     const handleOpenAdd = () => {
         setProductActionType('add');
         setSelectedProduct(null);
@@ -63,80 +162,70 @@ const Products = () => {
     };
 
     const handleOpenEdit = (product) => {
-        setProductActionType('change');
+        setProductActionType('edit');
         setSelectedProduct(product);
         setOpenAddProduct(true);
     };
 
-    const handleAddProduct = async (backendData, frontendData) => {
+    const handleAddProduct = async (productData) => {
         try {
-            const response = await fetch(`${API_URL}/add`, {
+            setLoading(true);
+            const response = await fetch(API_URL.add, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(backendData)
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(productData)
             });
 
-            if (!response.ok) {
-                throw new Error("Ошибка при добавлении товара");
-            }
-
-            const data = await response.json();
-            setProducts(prev => [...prev, {
-                ...frontendData,
-                id: data.product.product_id
-            }]);
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            await fetchProducts();
+            return true;
         } catch (err) {
-            console.error('Ошибка при добавлении товара:', err);
+            console.error("Ошибка при добавлении товара:", err);
+            setError("Не удалось добавить товар. Попробуйте позже.");
+            return false;
+        } finally {
+            setLoading(false);
         }
     };
 
-    const handleUpdateProduct = async (updatedProduct) => {
+    const handleUpdateProduct = async (productId, updates) => {
         try {
-            const response = await fetch(`${API_URL}/update`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    product_id: updatedProduct.id,
-                    field: 'product_name',
-                    value: updatedProduct.name
-                })
-            });
-
-            if (!response.ok) {
-                throw new Error("Ошибка при обновлении товара");
+            setLoading(true);
+            for (const [field, value] of Object.entries(updates)) {
+                const response = await fetch(API_URL.update, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ product_id: productId, field, value })
+                });
+                if (!response.ok) throw new Error(`Error updating ${field}`);
             }
-
-            setProducts(prev =>
-                prev.map(product =>
-                    product.id === updatedProduct.id ? updatedProduct : product
-                )
-            );
+            await fetchProducts();
+            return true;
         } catch (err) {
-            console.error('Ошибка при обновлении товара:', err);
+            console.error("Ошибка при обновлении товара:", err);
+            setError("Не удалось обновить товар. Попробуйте позже.");
+            return false;
+        } finally {
+            setLoading(false);
         }
     };
 
     const handleDeleteProduct = async (productId) => {
         try {
-            const response = await fetch(`${API_URL}/delete`, {
+            setLoading(true);
+            const response = await fetch(API_URL.delete, {
                 method: 'DELETE',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ product_id: productId })
             });
 
-            if (!response.ok) {
-                throw new Error("Ошибка при удалении товара");
-            }
-
-            setProducts(prev => prev.filter(product => product.id !== productId));
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            setProducts(prev => prev.filter(p => p.id !== productId));
         } catch (err) {
-            console.error('Ошибка при удалении товара:', err);
+            console.error("Ошибка при удалении товара:", err);
+            setError("Не удалось удалить товар. Попробуйте позже.");
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -149,18 +238,14 @@ const Products = () => {
                 handleClose={() => setOpenAddProduct(false)}
                 product={selectedProduct}
                 onAdd={handleAddProduct}
-                onUpdate={handleUpdateProduct}
+                onUpdate={(data) => handleUpdateProduct(selectedProduct.id, data)}
             />
 
-            {/* Остальная часть JSX остается без изменений */}
             <div className="workspace__header">
                 <Button onClick={() => setOpenExcel(true)} className="excel">
                     Выгрузить в Excel
                 </Button>
-                <Button
-                    onClick={handleOpenAdd}
-                    className="workspace__add-product"
-                >
+                <Button onClick={handleOpenAdd} className="workspace__add-product">
                     Добавить товар
                 </Button>
                 <Input
@@ -201,16 +286,10 @@ const Products = () => {
                                 <p className="amount">{product.amount}</p>
                                 <p className="category">{product.category}</p>
                                 <div className="actions">
-                                    <Button
-                                        onClick={() => handleOpenEdit(product)}
-                                        className="change button"
-                                    >
+                                    <Button onClick={() => handleOpenEdit(product)} className="change button">
                                         Изменить
                                     </Button>
-                                    <Button
-                                        onClick={() => handleDeleteProduct(product.id)}
-                                        className="delete button"
-                                    >
+                                    <Button onClick={() => handleDeleteProduct(product.id)} className="delete button">
                                         Удалить
                                     </Button>
                                 </div>
