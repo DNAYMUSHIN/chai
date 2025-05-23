@@ -23,24 +23,26 @@ const CreateOrder = (props) => {
     const [orderItems, setOrderItems] = useState([]);
     const [openManualAdd, setOpenManualAdd] = useState(false);
 
-    // Инициализация данных при открытии
     useEffect(() => {
         if (props.order && props.type === 'edit') {
-            setOrderItems(props.order.items);
+            setOrderItems(props.order.items || []);
         } else {
             setOrderItems([]);
         }
     }, [props.order, props.type]);
 
     const handleAddItem = (product) => {
-        // Проверяем, есть ли уже такой товар в заказе
-        const existingItem = orderItems.find(item => item.id === product.id);
+        const existingItem = orderItems.find(item => item.product_id === product.product_id);
 
         if (existingItem) {
             setOrderItems(prev =>
                 prev.map(item =>
-                    item.id === product.id
-                        ? { ...item, quantity: item.quantity + 1, total: `${parseInt(item.total) + parseInt(product.price)} руб.` }
+                    item.product_id === product.product_id
+                        ? {
+                            ...item,
+                            quantity: item.quantity + 1,
+                            total: (parseInt(item.price) * (item.quantity + 1))
+                        }
                         : item
                 )
             );
@@ -50,14 +52,14 @@ const CreateOrder = (props) => {
                 {
                     ...product,
                     quantity: 1,
-                    total: product.price
+                    total: parseInt(product.price)
                 }
             ]);
         }
     };
 
     const handleRemoveItem = (itemId) => {
-        setOrderItems(prev => prev.filter(item => item.id !== itemId));
+        setOrderItems(prev => prev.filter(item => item.product_id !== itemId));
     };
 
     const handleQuantityChange = (itemId, newQuantity) => {
@@ -65,12 +67,12 @@ const CreateOrder = (props) => {
 
         setOrderItems(prev =>
             prev.map(item => {
-                if (item.id === itemId) {
+                if (item.product_id === itemId) {
                     const pricePerUnit = parseInt(item.price);
                     return {
                         ...item,
                         quantity: newQuantity,
-                        total: `${pricePerUnit * newQuantity} руб.`
+                        total: pricePerUnit * newQuantity
                     };
                 }
                 return item;
@@ -79,13 +81,13 @@ const CreateOrder = (props) => {
     };
 
     const calculateTotal = () => {
-        return orderItems.reduce((sum, item) => sum + parseInt(item.total), 0);
+        return orderItems.reduce((sum, item) => sum + item.total, 0);
     };
 
     const handleSubmit = () => {
         const orderData = {
             items: orderItems,
-            total: `${calculateTotal()} руб.`
+            total: calculateTotal()
         };
 
         if (props.type === 'create') {
@@ -96,8 +98,6 @@ const CreateOrder = (props) => {
                 ...orderData
             });
         }
-
-        props.handleClose();
     };
 
     return (
@@ -152,28 +152,28 @@ const CreateOrder = (props) => {
                     ) : (
                         <ol className="create-order__main-list">
                             {orderItems.map((item) => (
-                                <li key={item.id} className="create-order__main-item">
+                                <li key={item.product_id} className="create-order__main-item">
                                     <p className="item__title">{item.name}</p>
-                                    <p className="detail__price">{item.price}</p>
+                                    <p className="detail__price">{item.price} руб.</p>
                                     <p className="detail__amount">
                                         {item.quantity} шт.
                                         <Button
                                             className="button button_add"
-                                            onClick={() => handleQuantityChange(item.id, item.quantity + 1)}
+                                            onClick={() => handleQuantityChange(item.product_id, item.quantity + 1)}
                                         >
                                             +
                                         </Button>
                                         <Button
                                             className="button button_remove"
-                                            onClick={() => handleQuantityChange(item.id, item.quantity - 1)}
+                                            onClick={() => handleQuantityChange(item.product_id, item.quantity - 1)}
                                         >
                                             -
                                         </Button>
                                     </p>
-                                    <p className="detail__total">{item.total}</p>
+                                    <p className="detail__total">{item.total} руб.</p>
                                     <Button
                                         className="button button_remove"
-                                        onClick={() => handleRemoveItem(item.id)}
+                                        onClick={() => handleRemoveItem(item.product_id)}
                                     >
                                         Удалить
                                     </Button>

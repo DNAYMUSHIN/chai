@@ -13,44 +13,50 @@ const style = {
     p: 4,
 };
 
-// Заглушка для поиска товаров
-const searchProducts = async (query) => {
-    const mockProducts = [
-        { id: 1, name: 'Конфета "Три медвежонка"', price: '10 руб.' },
-        { id: 2, name: 'Зеленый чай', price: '250 руб.' },
-        { id: 3, name: 'Кофе "Эспрессо"', price: '350 руб.' },
-    ];
-
-    return new Promise(resolve => {
-        setTimeout(() => {
-            resolve(mockProducts.filter(product =>
-                product.name.toLowerCase().includes(query.toLowerCase())
-            ));
-        }, 300);
-    });
-};
-
 const AddManually = ({ open, onClose, onAddProduct }) => {
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState([]);
     const [loading, setLoading] = useState(false);
 
     const handleSearch = async () => {
-        if (!searchQuery.trim()) return;
+        if (!searchQuery.trim()) {
+            setSearchResults([]);
+            return;
+        }
 
         setLoading(true);
         try {
-            const results = await searchProducts(searchQuery);
+            const response = await fetch('/api/product/p', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                },
+                body: JSON.stringify({ query: searchQuery })
+            });
+
+            if (!response.ok) {
+                throw new Error(response.status === 400
+                    ? 'Введите поисковый запрос'
+                    : 'Ошибка поиска товаров');
+            }
+
+            const results = await response.json();
             setSearchResults(results);
         } catch (error) {
-            console.error('Ошибка поиска:', error);
+            console.error('Ошибка поиска:', error.message);
+            setSearchResults([]);
         } finally {
             setLoading(false);
         }
     };
 
     const handleAddToOrder = (product) => {
-        onAddProduct(product);
+        onAddProduct({
+            product_id: product.product_id,
+            name: product.name,
+            price: product.price.toString()
+        });
         onClose();
     };
 
@@ -85,8 +91,8 @@ const AddManually = ({ open, onClose, onAddProduct }) => {
                 ) : searchResults.length > 0 ? (
                     <ul className="search-results">
                         {searchResults.map(product => (
-                            <li key={product.id} className="search-result-item">
-                                <span>{product.name} - {product.price}</span>
+                            <li key={product.product_id} className="search-result-item">
+                                <span>{product.name} - {product.price} руб.</span>
                                 <Button
                                     onClick={() => handleAddToOrder(product)}
                                 >

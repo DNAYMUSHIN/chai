@@ -296,6 +296,29 @@ async deleteProduct(req, res) {
 
 
 // Функция поиска по названию
+    async searchProduct(req, res) {
+        const { query } = req.body; // или req.query если GET запрос
+
+
+        console.log(query)
+        try {
+            if (!query) {
+                return res.status(400).json({ error: "Search query is required" });
+            }
+
+            const result = await db.query(
+                `SELECT * FROM product WHERE product_name ILIKE $1`,
+                [`%${query}%`]
+            );
+            res.json(result.rows);
+        }
+        catch(err) {
+            console.error('Search error:', err);
+            res.status(500).json({ error: "Internal server error" });
+        }
+    }
+
+/*// Функция поиска по названию
 async searchProduct(req, res)
 {
     const {value} = req.body;
@@ -309,7 +332,7 @@ async searchProduct(req, res)
         res.status(305).json({"error": err})
     }
     
-}
+}*/
 
 
 

@@ -1,31 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Button, Input } from "@mui/material";
+import { Button, Input, Select, MenuItem } from "@mui/material";
 import "./Orders.css";
 import CreateOrder from "./modals/CreateOrder.jsx";
-
-// Заглушка для имитации API заказов
-const fetchOrders = async () => {
-    return new Promise((resolve) => {
-        setTimeout(() => {
-            resolve({
-                success: true,
-                data: [
-                    {
-                        id: 1,
-                        number: '№56738',
-                        status: 'Оформлен',
-                        date: '01.03.2023',
-                        total: '1500 руб.',
-                        items: [
-                            { id: 1, name: 'Конфета "Три медвежонка"', price: '10 руб.', quantity: 5, total: '50 руб.' },
-                            { id: 2, name: 'Зеленый чай', price: '250 руб.', quantity: 2, total: '500 руб.' }
-                        ]
-                    }
-                ]
-            });
-        }, 500);
-    });
-};
 
 const Orders = () => {
     const [orders, setOrders] = useState([]);
@@ -40,14 +16,12 @@ const Orders = () => {
         const loadOrders = async () => {
             setLoading(true);
             try {
-                const response = await fetchOrders();
-                if (response.success) {
-                    setOrders(response.data);
-                } else {
-                    setError("Не удалось загрузить заказы");
-                }
+                const response = await fetch('/api/orders');
+                if (!response.ok) throw new Error('Ошибка загрузки заказов');
+                const data = await response.json();
+                setOrders(data);
             } catch (err) {
-                setError("Ошибка при загрузке заказов");
+                setError(err.message);
                 console.error(err);
             } finally {
                 setLoading(false);
@@ -69,29 +43,101 @@ const Orders = () => {
         setOpenOrderModal(true);
     };
 
-    const handleAddOrder = (newOrder) => {
-        // В реальном приложении здесь будет вызов API
-        setOrders(prev => [...prev, {
-            ...newOrder,
-            id: Date.now(),
-            number: `№${Math.floor(10000 + Math.random() * 90000)}`,
-            date: new Date().toLocaleDateString('ru-RU'),
-            status: 'Оформлен'
-        }]);
+    const handleAddOrder = async (newOrder) => {
+        try {
+            const response = await fetch('/api/order/create', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                },
+                body: JSON.stringify({
+                    admin_id: localStorage.getItem('admin_id'),
+                    product: newOrder.items.map(item => ({
+                        product_id: item.id,
+                        quantity: item.quantity,
+                        price: parseInt(item.price)
+                    }))
+                })
+            });
+
+            if (!response.ok) throw new Error('Ошибка создания заказа');
+
+            const createdOrder = await response.json();
+            setOrders(prev => [...prev, createdOrder]);
+        } catch (err) {
+            console.error(err);
+            alert(err.message);
+        }
     };
 
-    const handleUpdateOrder = (updatedOrder) => {
-        // В реальном приложении здесь будет вызов API
-        setOrders(prev =>
-            prev.map(order =>
-                order.id === updatedOrder.id ? updatedOrder : order
-            )
-        );
+    const handleUpdateOrder = async (updatedOrder) => {
+        try {
+            const response = await fetch('/api/order/status', {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                },
+                body: JSON.stringify({
+                    order_id: updatedOrder.order_id,
+                    status: updatedOrder.status
+                })
+            });
+
+            if (!response.ok) throw new Error('Ошибка обновления заказа');
+
+            setOrders(prev =>
+                prev.map(order =>
+                    order.order_id === updatedOrder.order_id ? updatedOrder : order
+                )
+            );
+        } catch (err) {
+            console.error(err);
+            alert(err.message);
+        }
+    };
+
+    const handleStatusChange = async (orderId, newStatus) => {
+        try {
+            const response = await fetch('/api/order/status', {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                },
+                body: JSON.stringify({
+                    order_id: orderId,
+                    status: newStatus
+                })
+            });
+
+            if (!response.ok) throw new Error('Ошибка обновления статуса');
+
+            const updatedOrder = await response.json();
+            setOrders(prev =>
+                prev.map(order =>
+                    order.order_id === orderId ? updatedOrder : order
+                )
+            );
+        } catch (err) {
+            console.error(err);
+            alert(err.message);
+        }
+    };
+
+    const getStatusText = (status) => {
+        switch(status) {
+            case 0: return 'Оформлен';
+            case 1: return 'Готов к выдаче';
+            case 2: return 'Выдан';
+            default: return 'Неизвестно';
+        }
     };
 
     const filteredOrders = orders.filter(order =>
-        order.number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        order.status.toLowerCase().includes(searchTerm.toLowerCase())
+        order.order_id.toString().includes(searchTerm.toLowerCase()) ||
+        getStatusText(order.status).toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     return (
@@ -114,7 +160,7 @@ const Orders = () => {
                 </Button>
                 <Input
                     type="text"
-                    placeholder="Поиск"
+                    placeholder="Поиск по номеру или статусу"
                     className="workspace__search"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
@@ -124,7 +170,7 @@ const Orders = () => {
                     <li className="workspace__feature">Статус</li>
                     <li className="workspace__feature">Дата</li>
                     <li className="workspace__feature">Цена</li>
-                    <li className="workspace__feature">Подробности и редактирование</li>
+                    <li className="workspace__feature">Действия</li>
                 </ul>
             </div>
             <div className="workspace__main">
@@ -139,16 +185,24 @@ const Orders = () => {
                 ) : (
                     <ul className="workspace__list orders-list">
                         {filteredOrders.map((order) => (
-                            <li key={order.id} className="workspace__item order orders-list__item">
-                                <p className="order__number">{order.number}</p>
-                                <p className="status">{order.status}</p>
-                                <p className="price-piece">{order.date}</p>
-                                <p className="unit">{order.total}</p>
+                            <li key={order.order_id} className="workspace__item order orders-list__item">
+                                <p className="order__number">{order.order_id}</p>
+                                <Select
+                                    value={order.status}
+                                    onChange={(e) => handleStatusChange(order.order_id, e.target.value)}
+                                    className="status-select"
+                                >
+                                    <MenuItem value={0}>Оформлен</MenuItem>
+                                    <MenuItem value={1}>Готов к выдаче</MenuItem>
+                                    <MenuItem value={2}>Выдан</MenuItem>
+                                </Select>
+                                <p className="price-piece">{new Date(order.createdat).toLocaleDateString('ru-RU')}</p>
+                                <p className="unit">{order.total} руб.</p>
                                 <Button
                                     onClick={() => handleOpenEdit(order)}
                                     className="change button"
                                 >
-                                    Открыть
+                                    Подробности
                                 </Button>
                             </li>
                         ))}
