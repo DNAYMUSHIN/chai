@@ -27,6 +27,9 @@ router.put('/order/status', adminController.updateOrderStatus);
 // Route for creating an order via the platform
 router.post('/order/create', adminController.createOrder);
 
+router.get('/order/get', adminController.getOrdersbyStatus)
+
+
 // Route for generating sales reports
 router.get('/report', adminController.generateDailyReport);
 
