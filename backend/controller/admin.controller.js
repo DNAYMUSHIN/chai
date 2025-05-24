@@ -56,7 +56,7 @@ async createAdmin(req, res){
 async enterAdmin(req, res) {
     const {admin_email, password} = req.body;
     console.log(admin_email, password)
-
+    /*
     try{
         const admin = await db.query(`SELECT * FROM admin 
             WHERE admin_email = $1 and admin_password = $2`,
@@ -72,8 +72,8 @@ async enterAdmin(req, res) {
     catch(err){
         console.log(err)
         res.status(501).json({message: "Ошибка сервера"})
-    }
-    /*try {
+    }*/
+    try {
         const tmp_admin = await db.query(`select * from admin where admin_email = $1`, [admin_email]);
         
         if (!tmp_admin.rows[0]) {
@@ -91,13 +91,13 @@ async enterAdmin(req, res) {
     } catch (error) {
         console.error("Ошибка входа:", error);
         return res.status(500).json({message:"Внутренняя ошибка сервера"});
-    }*/
+    }
 }
 
 /*------------------КАТЕГОРИИ--------------------*/
 async createCategory(req, res) {
     try {
-        const { category_name } = req.body;
+        const {category_name } = req.body;
 
         // Проверяем, что название категории передано
         if (!category_name) {
@@ -135,7 +135,7 @@ async getAllCategories(req, res) {
     }
 }
 
-    async deleteCategory(req, res) {
+async deleteCategory(req, res) {
         try {
             const { id } = req.params; // Получаем ID категории из URL
 
@@ -194,13 +194,14 @@ async getProductsByStatus(req, res){
 
 
 async addProduct(req, res){
-    const {product_category, product_name, product_type, product_price_unit, quinity, product_count_min, product_price_min, product_code} = req.body;
+    const {product_category, product_name, product_type, product_price_unit, quinity: quantity, product_count_min, product_price_min, product_code} = req.body;
     let type = product_type === ProductType.PIECE ? 1 : 2
     
-    if (!product_name || !product_category || product_price_unit == undefined || quinity == undefined)
+    if (!product_name || !product_category || product_price_unit == undefined || quantity == undefined)
     {
         return res.status(400).json({ error: 'Некорректные данные' });
     }
+    
 
     try 
     {
@@ -226,18 +227,18 @@ async addProduct(req, res){
         if (!checkproduct.rows[0])
         {
             let product_status = 1;
-            if (product_count_min > quinity){
+            if (product_count_min > quantity){
                 product_status = 0
             }
             // Запрос для добавление товара в БД product
             const newProduct = await db.query(
             `INSERT INTO Product (product_category_id, product_name, product_type, price_unit, quantity, product_count_min, product_price_min, product_code, product_status)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
-            [category_id, product_name, type, product_price_unit, quinity, product_count_min, product_price_min, product_code, product_status]);
+            [category_id, product_name, type, product_price_unit, quantity, product_count_min, product_price_min, product_code, product_status]);
             res.status(201).json({ message: 'Товар добавлен', product: newProduct.rows[0]});
         }
         else{
-            await db.query(`UPDATE product set quantity = $1 where product_id = $2`, [quinity + checkproduct.rows[0].quantity, checkproduct.rows[0].product_id])
+            await db.query(`UPDATE product set quantity = $1 where product_id = $2`, [quantity + checkproduct.rows[0].quantity, checkproduct.rows[0].product_id])
             res.status(200).json({message: "Количество товара было изменено"})
         }
 
@@ -296,27 +297,27 @@ async deleteProduct(req, res) {
 
 
 // Функция поиска по названию
-    async searchProduct(req, res) {
-        const { query } = req.body; // или req.query если GET запрос
+async searchProduct(req, res) {
+    const { query } = req.body; // или req.query если GET запрос
 
 
-        console.log(query)
-        try {
-            if (!query) {
-                return res.status(400).json({ error: "Search query is required" });
-            }
-
-            const result = await db.query(
-                `SELECT * FROM product WHERE product_name ILIKE $1`,
-                [`%${query}%`]
-            );
-            res.json(result.rows);
+    console.log(query)
+    try {
+        if (!query) {
+            return res.status(400).json({ error: "Search query is required" });
         }
-        catch(err) {
-            console.error('Search error:', err);
-            res.status(500).json({ error: "Internal server error" });
-        }
+
+        const result = await db.query(
+            `SELECT * FROM product WHERE product_name ILIKE $1`,
+            [`%${query}%`]
+        );
+        res.json(result.rows);
     }
+    catch(err) {
+        console.error('Search error:', err);
+        res.status(500).json({ error: "Internal server error" });
+    }
+}
 
 /*// Функция поиска по названию
 async searchProduct(req, res)
@@ -375,7 +376,7 @@ async createOrder(req, res){
                 );
             }
         }
-        res.status(201)
+        res.status(201).json({message: "Заказ создан"})
     }
     catch(err){
         res.status(500)
@@ -400,6 +401,37 @@ async updateOrderStatus(req, res) {
 }
 
 
+// Функция вывода заказов
+async getOrdersbyStatus(req, res){
+    const { status } = req.body;
+
+    try {
+        // Получаем все заказы
+        const ordersResult = await db.query(`SELECT * FROM Orders WHERE status = $1`, [status]);
+        const orders = ordersResult.rows;
+
+        // Получаем все товары для этих заказов одним запросом
+        const productsResult = await db.query(`
+            SELECT o.order_id, p.product_name, oi.quantity, oi.price
+            FROM Orders o
+            JOIN OrderItems oi ON o.order_id = oi.order_id
+            JOIN Product p ON oi.product_id = p.product_id
+            WHERE o.status = $1
+        `, [status]);
+        
+        const products = productsResult.rows;
+
+        res.status(200).json({
+            orders,
+            products
+        });
+    } catch (err) {
+        console.error(`Error: ${err}`);
+        res.status(500).send("Internal Server Error");
+    }
+}
+
+
 // Генерация отчета за день. Показывает, 
 async generateDailyReport(req, res){
     const day = req.body
@@ -414,7 +446,7 @@ async generateDailyReport(req, res){
 
 
 
- 
+
 
 
 }
