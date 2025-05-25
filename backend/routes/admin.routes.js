@@ -46,8 +46,7 @@ router.delete('/categories/:id', adminController.deleteCategory);
 
 
 // Route for generating sales reports
-
-//router.post('/reportProduct', adminController.generateProductReport);
+router.post('/reportProduct', adminController.generateProductReport);
 
 
 

@@ -5,6 +5,7 @@ const reportHelpers = require('./utils')
 const bcrypt = require('bcryptjs');
 const {ProductType} = require('../constants')
 const { time, error } = require('console');
+const { ADDRGETNETWORKPARAMS } = require('dns');
 class adminController{
 /*
 Управление товарами
@@ -160,8 +161,7 @@ async deleteCategory(req, res) {
             console.error("Ошибка при удалении категории:", e);
             res.status(500).json({ message: "Ошибка при удалении категории" });
         }
-    }
-
+}
 
     /*------------------КАТЕГОРИИ (КОНЕЦ)--------------------*/
 
@@ -432,7 +432,7 @@ async getOrdersbyStatus(req, res){
 }
 
 
-// Генерация отчета за день. Показывает, 
+// Генерация отчета за день.
 async generateDailyReport(req, res){
     const day = req.body
     const daily = day["day"].split('.').reverse().join('-')
@@ -444,6 +444,28 @@ async generateDailyReport(req, res){
     res.status(200).send("OOOO")
 }
 
+async generateProductReport(req, res){
+    const {status} = req.body
+    try{
+        const Products = await db.query('SELECT * FROM Product WHERE status = $1', [status]);
+
+        // Настраиваем заголовки ответа перед генерацией файла
+        res.setHeader(
+        'Content-Type',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        );
+        res.setHeader(
+        'Content-Disposition',
+        'attachment; filename="report.xlsx"'
+        );
+        await reportHelpers.generateProduct(Products.rows, res)
+        res.status(201).send(file)
+    }
+    catch(err){
+        console.log("Ошибка - ", err)
+        res.status(500).json({message: "Ошибка на сервере"})
+    }
+}
 
 
 

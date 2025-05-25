@@ -82,12 +82,56 @@ async function getHundredsTensUnits(num, units, teens, tens, hundreds = null) {
     return str.trim();
 }
 
+
+async function generateProduct(products, res, buyer = 'ЧАЙНАЯ ЛАВКА'){
+  const data = new Date()
+  const d = data.toISOString().slice(0, 10).split('-').reverse().join(".")
+  try{
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet(`Отчет по товарам ${d}`);
+        worksheet.columns = [
+        { width: 5 },  // №
+        { width: 25 }, // Товар
+        { width: 10 }, // Кол-во
+        { width: 5 },  // Ед.
+        { width: 10 }, // Цена
+        { width: 10 }  // Сумма
+      ];
+
+    worksheet.mergeCells('A1:F1');
+    worksheet.getCell('A1').value = `Отчет на день - ${d}`;
+    worksheet.getCell('A1').font = { bold: true, size: 14 };
+    worksheet.getCell('A1').alignment = { horizontal: 'center' };
+
+    const headerRow = worksheet.addRow(['№', 'Товар', 'Количество', 'Ед.', 'Цена', 'Сумма']);
+    headerRow.font = { bold: true };
+    headerRow.alignment = { horizontal: 'center' };
+    headerRow.eachCell(cell => {
+      cell.border = {
+        top: { style: 'thin' },
+        left: { style: 'thin' },
+        bottom: { style: 'thin' },
+        right: { style: 'thin' }
+      };
+    });
+
+
+    fillingcell(worksheet, products)
+
+    await workbook.xlsx.write(res)
+  }
+  catch(err){
+    console.log("Ошибка - ", err)
+    throw err
+  }
+}
+
 async function foo(products, buyer = 'ЧАЙНАЯ ЛАВКА', day) {
 
     const data = new Date()
     const d = data.toISOString().slice(0, 10).split('-').reverse().join(".")
     const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet(`Отчет по продажам за ${d}`);
+    const worksheet = workbook.addWorksheet(`Отчет по продажам за ${day}`);
   
     // Настройка колонок
     worksheet.columns = [
@@ -267,4 +311,4 @@ async function fillingcell(worksheet, products) {
 
 
 
-module.exports = {foo, generationRepProduct}
+module.exports = {foo, generationRepProduct, generateProduct}
