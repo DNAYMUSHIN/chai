@@ -16,9 +16,11 @@ const Orders = () => {
         const loadOrders = async () => {
             setLoading(true);
             try {
-                const response = await fetch('/api/orders');
+                // Загружаем только заказы со статусом 0 (активные)
+                const response = await fetch('/api/orders/?status=0');
                 if (!response.ok) throw new Error('Ошибка загрузки заказов');
                 const data = await response.json();
+
                 setOrders(data);
             } catch (err) {
                 setError(err.message);
@@ -54,17 +56,24 @@ const Orders = () => {
                 body: JSON.stringify({
                     admin_id: localStorage.getItem('admin_id'),
                     product: newOrder.items.map(item => ({
-                        product_id: item.id,
+                        product_id: item.product_id, // ← Используем product_id напрямую
                         quantity: item.quantity,
                         price: parseInt(item.price)
                     }))
                 })
             });
 
-            if (!response.ok) throw new Error('Ошибка создания заказа');
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || 'Ошибка создания заказа');
+            }
 
             const createdOrder = await response.json();
             setOrders(prev => [...prev, createdOrder]);
+
+
+            // Закрываем модальное окно после успешного создания
+            setOpenOrderModal(false);
         } catch (err) {
             console.error(err);
             alert(err.message);
@@ -135,13 +144,17 @@ const Orders = () => {
         }
     };
 
-    const filteredOrders = orders.filter(order =>
-        order.order_id.toString().includes(searchTerm.toLowerCase()) ||
-        getStatusText(order.status).toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredOrders = orders.filter(order => {
+        if (!order) return false; // Защита от undefined
 
+        const orderId = order.order_id ? order.order_id.toString() : '';
+        const statusText = getStatusText(order.status || 0).toLowerCase();
+        const search = searchTerm.toLowerCase();
+
+        return orderId.includes(search) || statusText.includes(search);
+    });
     return (
-        <section className="workspace products orders">
+        <section className="workspace orders">
             <CreateOrder
                 open={openOrderModal}
                 type={actionType}
@@ -180,30 +193,38 @@ const Orders = () => {
                     <div className="workspace__error">{error}</div>
                 ) : filteredOrders.length === 0 ? (
                     <div className="workspace__empty">
-                        {searchTerm ? 'Заказы не найдены' : 'Нет заказов'}
+                        {searchTerm ? 'Активные заказы не найдены' : 'Нет активных заказов'}
                     </div>
                 ) : (
                     <ul className="workspace__list orders-list">
                         {filteredOrders.map((order) => (
                             <li key={order.order_id} className="workspace__item order orders-list__item">
-                                <p className="order__number">{order.order_id}</p>
+                                <p className="order__number order__info">#{order.order_id}</p>
                                 <Select
                                     value={order.status}
                                     onChange={(e) => handleStatusChange(order.order_id, e.target.value)}
-                                    className="status-select"
+                                    className="status-select order__info"
                                 >
                                     <MenuItem value={0}>Оформлен</MenuItem>
                                     <MenuItem value={1}>Готов к выдаче</MenuItem>
                                     <MenuItem value={2}>Выдан</MenuItem>
                                 </Select>
-                                <p className="price-piece">{new Date(order.createdat).toLocaleDateString('ru-RU')}</p>
-                                <p className="unit">{order.total} руб.</p>
+                                <p className="order__date order__info">{new Date(order.createdat).toLocaleString('ru-RU')}</p>
+                                <p className="order__total order__info">{order.total} руб.</p>
                                 <Button
                                     onClick={() => handleOpenEdit(order)}
-                                    className="change button"
+                                    className="change button order__info"
                                 >
                                     Подробности
                                 </Button>
+                                {/*<div className="order-products">
+                                    {order.products && order.products.map((product, index) => (
+                                        <div key={index} className="product-item">
+                                            <span>{product.product_name}</span>
+                                            <span>{product.quantity} × {product.price} руб.</span>
+                                        </div>
+                                    ))}
+                                </div>*/}
                             </li>
                         ))}
                     </ul>

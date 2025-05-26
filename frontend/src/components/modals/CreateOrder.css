@@ -1,19 +1,25 @@
 .popup__create-add-order {
+    width: 80vw;
 
     .popup__header {
         display: grid;
         grid-template-columns: 1fr 1fr;
         grid-template-areas: "title close" "features features";
+        gap: 0.5rem 0;
     }
 
     .popup__title{
         grid-area: title;
+        font-size: 1.5rem;
+        line-height: 1;
+        margin: 0;
     }
 
     .create-order__button-wrapper {
         grid-area: close;
         display: flex;
-        justify-content: end;
+        justify-content: space-around;
+        flex-wrap: wrap;
     }
 
     .features {
@@ -22,7 +28,7 @@
         padding: 0;
         margin: 0;
         display: grid;
-        grid-template-columns: repeat(4, 1fr);
+        grid-template-columns: repeat(5, 1fr);
         text-align: center;
     }
 
@@ -30,12 +36,76 @@
         list-style: none;
         padding: 0;
         margin: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
     }
 
     .create-order__main-item {
         display: grid;
-        grid-template-columns: repeat(4, 1fr);
+        grid-template-columns: repeat(5, 1fr);
         text-align: center;
 
+    }
+
+    .empty-order {
+        margin-bottom: 0.5rem;
+        text-align: center;
+    }
+}
+
+@media screen and (max-width: 1400px) {
+    .popup__create-add-order {
+        .item__info {
+            overflow: auto;
+        }
+    }
+}
+
+@media screen and (max-width: 1200px) {
+
+    .popup__create-add-order {
+        .popup__header {
+            display: grid;
+            grid-template-columns: 1fr;
+            grid-template-areas: "title" "close" "features";
+            gap: 0.5rem 0;
+            text-align: center;
+        }
+    }
+
+    .popup__create-add-order, .create-order__main-item {
+        .features {
+            grid-template-columns: repeat(2, 1fr);
+            grid-template-areas: "name name"
+                                 "price amount"
+                                 "all add";
+            gap: 0.5rem 0;
+        }
+
+        .titles__title:nth-child(1){ grid-area: name; }
+        .titles__title:nth-child(2){ grid-area: price; }
+        .titles__title:nth-child(3){ grid-area: amount; }
+        .titles__title:nth-child(4){ grid-area: all; }
+        .titles__title:nth-child(5){ grid-area: add; }
+
+        .item__info:nth-child(1){ grid-area: name; }
+        .item__info:nth-child(2){ grid-area: price; }
+        .item__info:nth-child(3){ grid-area: amount; }
+        .item__info:nth-child(4){ grid-area: all; }
+        .item__info:nth-child(5){ grid-area: add; }
+    }
+}
+
+@media screen and (max-width: 650px) {
+    .popup__create-add-order {
+        width: 90vw;
+    }
+}
+
+@media screen and (max-width: 400px) {
+    .popup__create-add-order {
+        padding: 1rem 0 !important;
+        font-size: 15px;
     }
 }

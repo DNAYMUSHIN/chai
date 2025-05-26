@@ -4,7 +4,7 @@
         grid-template-columns: repeat(3, 1fr);
         grid-auto-rows: auto;
         grid-template-areas: "excel add search" "features features features";
-        padding-bottom: 0.5rem;
+        padding: 0 1rem 0.5rem;
     }
 
     .excel {
@@ -29,14 +29,107 @@
         text-align: center;
     }
 
-    .order {
+    .product {
         display: grid;
         grid-template-columns: repeat(7, 1fr);
         padding: 0;
         text-align: center;
+
+        p {
+            margin: 0;
+        }
+    }
+
+    .product__info {
+        width: 100%;
+        overflow: auto;
+    }
+
+    .workspace__feature {
+        overflow: auto;
     }
 
     .workspace__main {
-        padding: 0 1rem;
+        padding: 0;
     }
+
+    .actions {
+        display: flex;
+        flex-direction: column;
+        gap: 0.2rem;
+    }
+}
+
+@media screen and (max-width: 1100px) {
+    .products {
+        .workspace__features {
+            grid-template-columns: repeat(3, 1fr);
+            grid-template-areas: "name name name"
+                                 "status price unit"
+                                 "all category change";
+            gap: 0.5rem 0;
+            margin-top: 1rem;
+
+            .workspace__feature:nth-child(1) { grid-area: name; }
+            .workspace__feature:nth-child(2) { grid-area: status; }
+            .workspace__feature:nth-child(3) { grid-area: price; }
+            .workspace__feature:nth-child(4) { grid-area: unit; }
+            .workspace__feature:nth-child(5) { grid-area: all; }
+            .workspace__feature:nth-child(6) { grid-area: category; }
+            .workspace__feature:nth-child(7) { grid-area: change; }
+        }
+
+        .product {
+            grid-template-columns: repeat(3, 1fr);
+            grid-template-areas: "name name name"
+                                 "status price unit"
+                                 "all category change";
+
+
+            .product__info:nth-child(1) { grid-area: name; }
+            .product__info:nth-child(2) { grid-area: status; }
+            .product__info:nth-child(3) { grid-area: price; }
+            .product__info:nth-child(4) { grid-area: unit; }
+            .product__info:nth-child(5) { grid-area: all; }
+            .product__info:nth-child(6) { grid-area: category; }
+            .product__info:nth-child(7) { grid-area: change; }
+        }
+
+        .workspace__item {
+            padding: 1rem 0;
+        }
+    }
+}
+
+@media screen and (max-width: 550px) {
+
+    .products {
+        .workspace__features, .product {
+            grid-template-columns: repeat(2, 1fr);
+            grid-template-areas: "name name"
+                                 "status price"
+                                 "unit all"
+                                 "category change";
+
+        }
+
+
+        .workspace__header {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-auto-rows: auto;
+            grid-template-areas:
+        "excel excel excel"
+        "add add add"
+        "search search search"
+        "features features features";
+            padding: 0 1rem 0.5rem;
+        }
+    }
+
+    .crm__main {
+        padding: 1rem;
+    }
+
+
 }

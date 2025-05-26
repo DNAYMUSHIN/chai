@@ -44,24 +44,26 @@ const CRM = observer(() => {
                     <nav className="crm__nav">
                         <ul className="crm__nav-list">
                             <li className="crm__nav-item">
-                                <Button onClick={() => handleButtonClick("Orders")} variant="text">Заказы</Button>
+                                <Button onClick={() => handleButtonClick("Orders")} variant="contained">Заказы</Button>
                             </li>
                             <li className="crm__nav-item">
-                                <Button onClick={() => handleButtonClick("Products")} variant="text">Товары</Button>
+                                <Button onClick={() => handleButtonClick("Products")} variant="contained">Товары</Button>
                             </li>
                             <li className="crm__nav-item">
-                                <Button onClick={() => handleButtonClick("Categories")}  variant="text">Категории</Button>
+                                <Button onClick={() => handleButtonClick("Categories")}  variant="contained">Категории</Button>
                             </li>
                         </ul>
                     </nav>
                 </div>
                 <div className="crm__aside-logout">
                     <Button
+                        variant="outlined"
                         onClick={() => {
                         user.setIsAuth(false);
                         navigate(LOGIN_ROUTE);
+
                     }}>
-                        LOG OUT
+                        Выход
                     </Button>
                 </div>
             </div>

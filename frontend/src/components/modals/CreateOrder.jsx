@@ -8,7 +8,6 @@ const style = {
     top: '50%',
     left: '50%',
     transform: 'translate(-50%, -50%)',
-    width: '80vw',
     bgcolor: 'background.paper',
     borderRadius: '2rem',
     boxShadow: 24,
@@ -84,19 +83,28 @@ const CreateOrder = (props) => {
         return orderItems.reduce((sum, item) => sum + item.total, 0);
     };
 
-    const handleSubmit = () => {
+    const handleSubmit = async () => {
         const orderData = {
-            items: orderItems,
+            items: orderItems.map(item => ({
+                product_id: item.product_id || item.id,
+                quantity: item.quantity,
+                price: parseInt(item.price)
+            })),
             total: calculateTotal()
         };
 
-        if (props.type === 'create') {
-            props.onAdd(orderData);
-        } else {
-            props.onUpdate({
-                ...props.order,
-                ...orderData
-            });
+        try {
+            if (props.type === 'create') {
+                await props.onAdd(orderData); // Ждем завершения
+                setOrderItems([]); // Очищаем список товаров
+            } else {
+                await props.onUpdate({
+                    ...props.order,
+                    ...orderData
+                });
+            }
+        } catch (error) {
+            console.error("Ошибка при обработке заказа:", error);
         }
     };
 
@@ -116,11 +124,11 @@ const CreateOrder = (props) => {
                 />
 
                 <div className="popup__header">
-                    <div className="popup__title">
+                    <h1 className="popup__title">
                         {props.type === "create" ?
                             <span className="create__item">Создание</span> :
                             <span className="change__item">Редактирование</span>} заказа
-                    </div>
+                    </h1>
                     <div className="create-order__button-wrapper">
                         <Button
                             onClick={props.handleClose}
@@ -143,19 +151,20 @@ const CreateOrder = (props) => {
                         <li className="titles__title">Цена за ед.</li>
                         <li className="titles__title">Количество</li>
                         <li className="titles__title">Общая стоимость</li>
+                        <li className="titles__title">Добавить</li>
                     </ul>
                 </div>
 
                 <div className="popup__main">
-                    {orderItems.length === 0 ? (
+                {orderItems.length === 0 ? (
                         <div className="empty-order">Добавьте товары в заказ</div>
                     ) : (
                         <ol className="create-order__main-list">
                             {orderItems.map((item) => (
                                 <li key={item.product_id} className="create-order__main-item">
-                                    <p className="item__title">{item.name}</p>
-                                    <p className="detail__price">{item.price} руб.</p>
-                                    <p className="detail__amount">
+                                    <p className="item__title item__info">{item.name}</p>
+                                    <p className="detail__price item__info">{item.price} руб.</p>
+                                    <p className="detail__amount item__info">
                                         {item.quantity} шт.
                                         <Button
                                             className="button button_add"
@@ -170,9 +179,9 @@ const CreateOrder = (props) => {
                                             -
                                         </Button>
                                     </p>
-                                    <p className="detail__total">{item.total} руб.</p>
+                                    <p className="detail__total item__info">{item.total} руб.</p>
                                     <Button
-                                        className="button button_remove"
+                                        className="button button_remove item__info"
                                         onClick={() => handleRemoveItem(item.product_id)}
                                     >
                                         Удалить

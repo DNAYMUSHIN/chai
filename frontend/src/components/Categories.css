@@ -29,9 +29,51 @@
 
 .workspace__item {
     border: 1px solid rgba(0, 0, 0, 0.1);
-    border-radius: 2rem;
+    border-radius: 0.5rem;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 0 2rem;
+    padding: 0.5rem 2rem;
+    flex-wrap: wrap;
+    gap: 0.5rem 0;
+}
+
+.workspace__category-name {
+    margin: 0;
+    max-width: 60vw;
+    overflow: auto;
+}
+
+.workspace__item button {
+    padding: 0;
+}
+
+@media screen and (max-width: 768px) {
+    .workspace {
+        padding: 0;
+    }
+
+    .workspace__header {
+        padding: 0;
+        justify-content: space-between;
+        gap: 0;
+    }
+
+    .workspace__main {
+        padding-top: 1rem;
+    }
+    .workspace__list {
+        padding: 0;
+    }
+}
+
+@media screen and (max-width: 550px) {
+    .workspace__header {
+        flex-direction: column-reverse;
+        gap: 0.5rem;
+    }
+
+    .workspace__header input {
+        text-align: center;
+    }
 }

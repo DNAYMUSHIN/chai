@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { Button, Input } from "@mui/material";
 import "./Categories.css";
+import CategoriesWarning from "./modals/CategoriesWarning.jsx";
 
 const Categories = () => {
     const [category, setCategory] = useState("");
     const [categories, setCategories] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
+    const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+    const [categoryToDelete, setCategoryToDelete] = useState(null);
 
     // Реальная функция получения категорий
     const fetchCategories = async () => {
@@ -37,8 +40,7 @@ const Categories = () => {
             setLoading(true);
 
             const response = await fetch('/api/categories', {
-                method: '' +
-                    '',
+                method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
@@ -62,10 +64,19 @@ const Categories = () => {
         }
     };
 
-    const handleDeleteCategory = async (categoryId) => {
+    const handleDeleteClick = (categoryId) => {
+        setCategoryToDelete(categoryId);
+        setDeleteModalOpen(true);
+    };
+
+    const handleConfirmDelete = async () => {
+        if (!categoryToDelete) return;
+
         try {
             setLoading(true);
-            const response = await fetch(`/api/categories/${categoryId}`, {
+            setDeleteModalOpen(false);
+
+            const response = await fetch(`/api/categories/${categoryToDelete}`, {
                 method: 'DELETE'
             });
 
@@ -73,7 +84,8 @@ const Categories = () => {
                 throw new Error("Не удалось удалить категорию");
             }
 
-            setCategories(prev => prev.filter(cat => cat.category_id !== categoryId));
+            setCategories(prev => prev.filter(cat => cat.category_id !== categoryToDelete));
+            setCategoryToDelete(null);
         } catch (err) {
             setError(err.message || "Ошибка при удалении категории");
             console.error(err);
@@ -82,8 +94,18 @@ const Categories = () => {
         }
     };
 
+    const handleCloseModal = () => {
+        setDeleteModalOpen(false);
+        setCategoryToDelete(null);
+    };
+
     return (
         <section className="workspace">
+            <CategoriesWarning
+                open={deleteModalOpen}
+                handleClose={handleCloseModal}
+                onConfirm={handleConfirmDelete}
+            />
             <div className="workspace__header">
                 <Input
                     type="text"
@@ -116,7 +138,7 @@ const Categories = () => {
                                 <p className="workspace__category-name">{cat.category_name}</p>
                                 <Button
                                     className="workspace__category-delete"
-                                    onClick={() => handleDeleteCategory(cat.category_id)}
+                                    onClick={() => handleDeleteClick(cat.category_id)}
                                     disabled={loading}
                                 >
                                     {loading ? "Удаление..." : "Удалить"}

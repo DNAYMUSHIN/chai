@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Modal, Box, Button, Input } from "@mui/material";
 
+import "./AddManually.css"
+
 const style = {
     position: 'absolute',
     top: '50%',
@@ -53,9 +55,10 @@ const AddManually = ({ open, onClose, onAddProduct }) => {
 
     const handleAddToOrder = (product) => {
         onAddProduct({
-            product_id: product.product_id,
-            name: product.name,
-            price: product.price.toString()
+            product_id: product.product_id, // ← Это обязательно
+            id: product.product_id,        // ← Для совместимости с CreateOrder
+            name: product.product_name,
+            price: product.price || product.quantity // Исправлено: price вместо quantity
         });
         onClose();
     };
@@ -66,7 +69,7 @@ const AddManually = ({ open, onClose, onAddProduct }) => {
             onClose={onClose}
             aria-labelledby="add-manually-modal"
         >
-            <Box sx={style}>
+            <Box sx={style} className="add-manually-modal">
                 <h2>Добавить товар вручную</h2>
 
                 <div className="search-container">
@@ -86,24 +89,27 @@ const AddManually = ({ open, onClose, onAddProduct }) => {
                     </Button>
                 </div>
 
-                {loading ? (
-                    <div>Загрузка...</div>
-                ) : searchResults.length > 0 ? (
-                    <ul className="search-results">
-                        {searchResults.map(product => (
-                            <li key={product.product_id} className="search-result-item">
-                                <span>{product.name} - {product.price} руб.</span>
-                                <Button
-                                    onClick={() => handleAddToOrder(product)}
-                                >
-                                    Добавить
-                                </Button>
-                            </li>
-                        ))}
-                    </ul>
-                ) : searchQuery ? (
-                    <div>Товары не найдены</div>
-                ) : null}
+                <div className="search-results-wrapper">
+
+                    {loading ? (
+                        <div>Загрузка...</div>
+                    ) : searchResults.length > 0 ? (
+                        <ul className="search-results">
+                            {searchResults.map(product => (
+                                <li key={product.product_id} className="search-result-item">
+                                    <span>{product.product_name} - {product.quantity} руб.</span>
+                                    <Button variant="contained"
+                                        onClick={() => handleAddToOrder(product)}
+                                    >
+                                        Добавить
+                                    </Button>
+                                </li>
+                            ))}
+                        </ul>
+                    ) : searchQuery ? (
+                        <div>Товары не найдены</div>
+                    ) : null}
+                </div>
 
                 <div className="modal-actions">
                     <Button onClick={onClose}>Закрыть</Button>

@@ -57,23 +57,6 @@ async createAdmin(req, res){
 async enterAdmin(req, res) {
     const {admin_email, password} = req.body;
     console.log(admin_email, password)
-    /*
-    try{
-        const admin = await db.query(`SELECT * FROM admin 
-            WHERE admin_email = $1 and admin_password = $2`,
-        [admin_email, password])
-        if (admin.rows.length > 0) {  
-            console.log(admin.rows[0])
-            res.status(201).send(admin.rows[0])
-        }
-        else{
-            res.status(401).json({message: "Неправильный логин и пароль"})
-        }
-    }
-    catch(err){
-        console.log(err)
-        res.status(501).json({message: "Ошибка сервера"})
-    }*/
     try {
         const tmp_admin = await db.query(`select * from admin where admin_email = $1`, [admin_email]);
         
@@ -83,9 +66,13 @@ async enterAdmin(req, res) {
         
         const password_with_table = tmp_admin.rows[0].admin_password;
         const check = await bcrypt.compare(password, password_with_table);
-        
+
         if(check) {
-            return res.status(200).json({ message: "Вы вошли"});
+            return res.status(200).json({
+                success: true,
+                admin_id: tmp_admin.rows[0].admin_id, // Оставляем в корне
+                message: "Авторизация успешна" // Добавляем для фронта
+            });
         } else {
             return res.status(401).json({message: "Неправильный пароль"});
         }
@@ -254,7 +241,7 @@ async updateProduct(req, res) {
     try {
         // Если обновляется категория - сначала находим её ID
         if (field === 'product_category') {
-            const categoryQuery = 'SELECT category_id FROM Categories WHERE category_name = $1';
+            const categoryQuery = 'SELECT category_id FROM category WHERE category_name = $1';
             const categoryResult = await db.query(categoryQuery, [value]);
 
             if (categoryResult.rows.length === 0) {
@@ -300,8 +287,6 @@ async deleteProduct(req, res) {
 async searchProduct(req, res) {
     const { query } = req.body; // или req.query если GET запрос
 
-
-    console.log(query)
     try {
         if (!query) {
             return res.status(400).json({ error: "Search query is required" });
@@ -400,8 +385,36 @@ async updateOrderStatus(req, res) {
     }
 }
 
+async getOrdersbyStatus(req, res) {
+    const { status } = req.query; // Изменяем с req.body на req.query
 
-// Функция вывода заказов
+    try {
+        // Получаем заказы с указанным статусом
+        const ordersResult = await db.query(`
+        SELECT o.*, 
+               json_agg(json_build_object(
+                   'product_name', p.product_name,
+                   'quantity', oi.quantity,
+                   'price', oi.price
+               )) as products
+        FROM Orders o
+        LEFT JOIN OrderItems oi ON o.order_id = oi.order_id
+        LEFT JOIN Product p ON oi.product_id = p.product_id
+        WHERE o.status = $1
+        GROUP BY o.order_id
+        ORDER BY o.createdat DESC
+    `, [status]);
+
+        res.status(200).json(ordersResult.rows);
+    } catch (err) {
+        console.error(`Error: ${err}`);
+        res.status(500).send("Internal Server Error");
+    }
+}
+
+
+
+/*
 async getOrdersbyStatus(req, res){
     const { status } = req.body;
 
@@ -418,7 +431,7 @@ async getOrdersbyStatus(req, res){
             JOIN Product p ON oi.product_id = p.product_id
             WHERE o.status = $1
         `, [status]);
-        
+
         const products = productsResult.rows;
 
         res.status(200).json({
@@ -429,7 +442,7 @@ async getOrdersbyStatus(req, res){
         console.error(`Error: ${err}`);
         res.status(500).send("Internal Server Error");
     }
-}
+}*/
 
 
 // Генерация отчета за день.
@@ -444,7 +457,42 @@ async generateDailyReport(req, res){
     res.status(200).send("OOOO")
 }
 
-async generateProductReport(req, res){
+async generateProductReport(req, res) {
+    const { status } = req.body;
+    try {
+        let query = 'SELECT * FROM Product';
+        let params = [];
+
+        // В зависимости от статуса изменяем запрос
+        if (status !== 'all') {
+            query += ' WHERE status = $1';
+            params.push(status);
+        }
+
+        const Products = await db.query(query, params);
+
+        // Настраиваем заголовки ответа перед генерацией файла
+        res.setHeader(
+            'Content-Type',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        );
+        res.setHeader(
+            'Content-Disposition',
+            'attachment; filename="report.xlsx"'
+        );
+
+        // Генерируем и отправляем файл
+        await reportHelpers.generateProduct(Products.rows, res);
+
+        // Не нужно отправлять res.status(201).send(file), так как generateProduct уже отправляет ответ
+    }
+    catch(err) {
+        console.log("Ошибка - ", err);
+        res.status(500).json({message: "Ошибка на сервере"});
+    }
+}
+
+/*async generateProductReport(req, res){
     const {status} = req.body
     try{
         const Products = await db.query('SELECT * FROM Product WHERE status = $1', [status]);
@@ -465,7 +513,7 @@ async generateProductReport(req, res){
         console.log("Ошибка - ", err)
         res.status(500).json({message: "Ошибка на сервере"})
     }
-}
+}*/
 
 
 

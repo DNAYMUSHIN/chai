@@ -55,9 +55,11 @@ const Login = () => {
                 return;
             }
 
+
             if (response.success) {
                 showAlert('success', 'Вы успешно авторизовались!');
                 user.setIsAuth(true);
+                user.setAdminId(response.admin_id); // ← Берем из корня, а не из data
                 navigate(CRM_ROUTE, { replace: true });
             } else {
                 showAlert('error', response.message || 'Ошибка авторизации');
@@ -73,26 +75,31 @@ const Login = () => {
         try {
             const response = await fetch("/api/loginAd", {
                 method: "POST",
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    admin_email: login,
-                    password: password,
-                })
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ admin_email: login, password })
             });
 
+            const data = await response.json(); // Парсим в любом случае
 
             if (!response.ok) {
-                const errorData = await response.json().catch(() => ({})); // На случай, если сервер не вернёт JSON
-                throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+                return {
+                    success: false,
+                    message: data.message || `Ошибка ${response.status}`
+                };
             }
 
-            const data = await response.json();
-            return { success: response.status === 201, message: data.message };
+            return {
+                success: true,
+                admin_id: data.admin_id, // Забираем из корня ответа
+                message: data.message
+            };
+
         } catch (error) {
             console.error("FetchAuth error:", error);
-            return { success: false, message: error.message || "Ошибка подключения к серверу" };
+            return {
+                success: false,
+                message: "Ошибка подключения"
+            };
         }
     };
 

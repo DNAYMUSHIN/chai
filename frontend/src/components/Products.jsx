@@ -3,6 +3,8 @@ import { Button, Input } from "@mui/material";
 import "./Products.css";
 import Excel from "./modals/Excel.jsx";
 import AddProduct from "./modals/AddProduct.jsx";
+import ProductDelete from "./modals/ProductDelete.jsx"; // Импортируем компонент подтверждения удаления
+
 
 const API_URL_MAIN = "/api/product/";
 const API_CATEGORIES = "/api/categories";
@@ -27,6 +29,30 @@ const Products = () => {
     const [productActionType, setProductActionType] = useState('add');
     const [selectedProduct, setSelectedProduct] = useState(null);
 
+    // Добавляем состояние для модального окна удаления
+    const [openDeleteModal, setOpenDeleteModal] = useState(false);
+    const [productToDelete, setProductToDelete] = useState(null);
+
+    // Функция для открытия модального окна удаления
+    const handleOpenDeleteModal = (productId) => {
+        setProductToDelete(productId);
+        setOpenDeleteModal(true);
+    };
+
+    // Функция для закрытия модального окна удаления
+    const handleCloseDeleteModal = () => {
+        setOpenDeleteModal(false);
+        setProductToDelete(null);
+    };
+
+    // Функция для подтверждения удаления
+    const handleConfirmDelete = async () => {
+        if (productToDelete) {
+            await handleDeleteProduct(productToDelete);
+            handleCloseDeleteModal();
+        }
+    };
+
     // Загрузка категорий
     const fetchCategories = async () => {
         try {
@@ -46,9 +72,9 @@ const Products = () => {
         setError(null);
         try {
             // Загружаем категории, если еще не загружены
-           /* if (categories.length === 0) {
-                await fetchCategories();
-            }*/
+            /* if (categories.length === 0) {
+                 await fetchCategories();
+             }*/
 
             const response = await fetch(API_URL.getAll);
             if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
@@ -80,13 +106,13 @@ const Products = () => {
         }
     };
 
-   /* useEffect(() => {
-        fetchCategories().then(() => {
-                console.log(categories);
-                fetchProducts();
-            }
-        );
-    }, []);*/
+    /* useEffect(() => {
+         fetchCategories().then(() => {
+                 console.log(categories);
+                 fetchProducts();
+             }
+         );
+     }, []);*/
 
 
 
@@ -229,16 +255,24 @@ const Products = () => {
         }
     };
 
+
     return (
         <section className="workspace products">
-            <Excel open={openExcel} handleClose={() => setOpenExcel(false)} />
+            <Excel open={openExcel} handleClose={() => setOpenExcel(false)}/>
             <AddProduct
                 open={openAddProduct}
                 type={productActionType}
                 handleClose={() => setOpenAddProduct(false)}
                 product={selectedProduct}
                 onAdd={handleAddProduct}
-                onUpdate={(data) => handleUpdateProduct(selectedProduct.id, data)}
+                onUpdate={(data) => handleUpdateProduct(selectedProduct?.id, data)}
+            />
+
+            {/* Добавляем модальное окно подтверждения удаления */}
+            <ProductDelete
+                open={openDeleteModal}
+                handleClose={handleCloseDeleteModal}
+                onConfirm={handleConfirmDelete}
             />
 
             <div className="workspace__header">
@@ -278,18 +312,22 @@ const Products = () => {
                 ) : (
                     <ul className="workspace__list orders-list">
                         {filteredProducts.map((product) => (
-                            <li key={product.id} className="workspace__item order orders-list__item">
-                                <p className="order__number">{product.name}</p>
-                                <p className="status">{product.status}</p>
-                                <p className="price-piece">{product.price}</p>
-                                <p className="unit">{product.unit}</p>
-                                <p className="amount">{product.amount}</p>
-                                <p className="category">{product.category}</p>
-                                <div className="actions">
+                            <li key={product.id} className="workspace__item product">
+                                <p className="order__number product__info">{product.name}</p>
+                                <p className="status product__info">{product.status}</p>
+                                <p className="price-piece product__info">{product.price}</p>
+                                <p className="unit product__info">{product.unit}</p>
+                                <p className="amount product__info">{product.amount}</p>
+                                <p className="category product__info">{product.category}</p>
+                                <div className="actions product__info">
                                     <Button onClick={() => handleOpenEdit(product)} className="change button">
                                         Изменить
                                     </Button>
-                                    <Button onClick={() => handleDeleteProduct(product.id)} className="delete button">
+                                    {/* Изменяем обработчик удаления */}
+                                    <Button
+                                        onClick={() => handleOpenDeleteModal(product.id)}
+                                        className="delete button"
+                                    >
                                         Удалить
                                     </Button>
                                 </div>

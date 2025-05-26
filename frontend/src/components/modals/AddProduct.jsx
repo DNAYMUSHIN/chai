@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Button, FormControlLabel, Input, Modal, Radio, RadioGroup, MenuItem, Select, FormControl, InputLabel } from "@mui/material";
 import "./AddProduct.css";
+import fakeFetchApi from "../../tests/Products.test.js";
 
 const style = {
     position: 'absolute',
@@ -38,7 +39,7 @@ const AddProduct = (props) => {
         const fetchCategories = async () => {
             setLoadingCategories(true);
             try {
-                const response = await fetch('/api/categories');
+                const response = await fakeFetchApi('/api/categories');
                 const data = await response.json();
                 setCategories(data);
             } catch (error) {
@@ -161,11 +162,11 @@ const AddProduct = (props) => {
         >
             <Box sx={{ ...style }} className="popup__create-add">
                 <div className="popup__header">
-                    <div className="popup__title">
+                    <h2 className="popup__title">
                         {props.type === "add" ?
                             <span className="create__item">Создание</span> :
                             <span className="change__item">Редактирование</span>} товара
-                    </div>
+                    </h2>
                     <div className="create-order__button-wrapper">
                         <Button onClick={props.handleClose} className="create-order__button button create-order__button-reject">
                             Отменить&#160;
@@ -174,26 +175,24 @@ const AddProduct = (props) => {
                                 <span className="change__item">редактирование</span>}
                         </Button>
                     </div>
-                </div>
-                <div className="popup__main" style={{ maxHeight: 'calc(90vh - 120px)', overflowY: 'auto' }}>
+                </div>{/*maxHeight: 'calc(90vh - 120px)', */}
+                <div className="popup__main" style={{ overflowY: 'auto' }}>
                     <form className="create__form" onSubmit={handleSubmit}>
-                        <h2 className="create__title">Наименование:</h2>
                         <div className="create__form-inner-wrapper">
-                            <div className="search-wrapper">
-                                <Input
-                                    placeholder="Название товара"
-                                    type="text"
-                                    name="product_name"
-                                    className="search"
-                                    value={formData.product_name}
-                                    onChange={handleChange}
-                                    required
-                                />
-                            </div>
+                            <h3 className="create__title">Наименование:</h3>
+                            <Input
+                                placeholder="Название товара"
+                                type="text"
+                                name="product_name"
+                                className="name"
+                                value={formData.product_name}
+                                onChange={handleChange}
+                                required
+                            />
                         </div>
 
-                        <h2 className="create__title">Категория:</h2>
                         <div className="create__form-inner-wrapper">
+                            <h3 className="create__title">Категория:</h3>
                             <FormControl fullWidth>
                                 <InputLabel id="category-select-label">Категория</InputLabel>
                                 <Select
@@ -217,23 +216,27 @@ const AddProduct = (props) => {
                             </FormControl>
                         </div>
 
-                        <h2 className="create__title">В чем измеряется:</h2>
                         <div className="create__form-gram-inner-wrapper">
+                            <h3 className="create__title">В чем измеряется:</h3>
                             <div className="create__radio-wrapper">
                                 <RadioGroup
                                     aria-labelledby="unit-type-group"
                                     name="product_type"
                                     value={formData.product_type}
                                     onChange={handleTypeChange}
+                                    style={{
+                                        display: "flex",
+                                        flexDirection: "row",
+                                    }}
                                 >
-                                    <FormControlLabel value="шт" control={<Radio />} label="Штука" />
-                                    <FormControlLabel value="гр" control={<Radio />} label="Граммы" />
+                                    <FormControlLabel value="шт" control={<Radio/>} label="Штука"/>
+                                    <FormControlLabel value="гр" control={<Radio/>} label="Граммы"/>
                                 </RadioGroup>
                             </div>
 
                             <div className="create__gramm-price">
-                                <p className="create__gramm-text">
-                                    Цена за {formData.product_type === 'шт' ? 'штуку' : '100 грамм'}
+                                <div className="create__gramm-text">
+                                    Цена за {formData.product_type === 'шт' ? 'штуку' : '100 грамм'}&#160;
                                     <Input
                                         placeholder="0"
                                         type="text"
@@ -241,18 +244,18 @@ const AddProduct = (props) => {
                                         className="price-gramm"
                                         value={formData.product_price_unit}
                                         onChange={handleChange}
-                                        inputProps={{ inputMode: 'numeric', pattern: '[0-9.]*' }}
+                                        inputProps={{inputMode: 'numeric', pattern: '[0-9.]*'}}
                                         required
-                                    />
+                                    />&#160;
                                     рублей
-                                </p>
+                                </div>
                             </div>
                         </div>
 
-                        <h2 className="create__title">Общее количество товара:</h2>
                         <div className="create__form-gram-inner-wrapper">
+                            <h3 className="create__title">Общее количество товара:</h3>
                             <div className="create__gramm-price">
-                                <p className="create__gramm-text">
+                                <div className="create__gramm-text">
                                     <Input
                                         placeholder="0"
                                         type="text"
@@ -261,15 +264,15 @@ const AddProduct = (props) => {
                                         value={formData.quinity}
                                         onChange={handleChange}
                                         required
-                                        inputProps={{ inputMode: 'numeric', pattern: '[0-9.]*' }}
+                                        inputProps={{inputMode: 'numeric', pattern: '[0-9.]*'}}
                                     />
                                     {formData.product_type === 'шт' ? 'штук' : 'грамм'}
-                                </p>
+                                </div>
                             </div>
                         </div>
 
-                        <h2 className="create__title">Минимальное количество:</h2>
                         <div className="create__form-inner-wrapper">
+                            <h3 className="create__title">Минимальное количество:</h3>
                             <Input
                                 placeholder="0"
                                 type="text"
@@ -277,12 +280,12 @@ const AddProduct = (props) => {
                                 className="search"
                                 value={formData.product_count_min}
                                 onChange={handleChange}
-                                inputProps={{ inputMode: 'numeric', pattern: '[0-9.]*' }}
+                                inputProps={{inputMode: 'numeric', pattern: '[0-9.]*'}}
                             />
                         </div>
 
-                        <h2 className="create__title">Минимальная цена:</h2>
                         <div className="create__form-inner-wrapper">
+                            <h3 className="create__title">Минимальная цена:</h3>
                             <Input
                                 placeholder="0"
                                 type="text"
@@ -290,12 +293,12 @@ const AddProduct = (props) => {
                                 className="search"
                                 value={formData.product_price_min}
                                 onChange={handleChange}
-                                inputProps={{ inputMode: 'numeric', pattern: '[0-9.]*' }}
+                                inputProps={{inputMode: 'numeric', pattern: '[0-9.]*'}}
                             />
                         </div>
 
                         <div className="button-create-wrapper">
-                            <Button
+                        <Button
                                 type="submit"
                                 className="create-order__button button button-create"
                             >

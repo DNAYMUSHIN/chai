@@ -1,6 +1,5 @@
 import React from 'react';
 import {Box, Button, Modal} from "@mui/material";
-
 import "./Excel.css"
 
 const style = {
@@ -17,8 +16,41 @@ const style = {
     pb: 3,
 };
 
-
 const Excel = (props) => {
+    const handleDownload = async (status) => {
+        try {
+            const response = await fetch('/api/reportProduct', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}` // если используется авторизация
+                },
+                body: JSON.stringify({ status })
+            });
+
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+
+            // Создаем blob из ответа
+            const blob = await response.blob();
+
+            // Создаем ссылку для скачивания
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'report.xlsx';
+            document.body.appendChild(a);
+            a.click();
+
+            // Очищаем
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+
+        } catch (error) {
+            console.error('Error downloading file:', error);
+        }
+    };
 
     return (
         <React.Fragment>
@@ -30,10 +62,10 @@ const Excel = (props) => {
             >
                 <Box sx={{ ...style, width: "80vw"}} className="excel-popup">
                     <h2 id="child-modal-title" className="title">Выгрузка в Excel</h2>
-                    <Button className="exit" onClick={props.handleClose}>Закрыть</Button>
-                    <Button className="button-all" onClick={() => console.log("1")}>Все товары  (имеющиеся, законченные, отключенные и тд)</Button>
-                    <Button className="button-need" onClick={() => console.log("2")}>Необходимый товар к следующей покупке</Button>
-                    <Button className="button-have" onClick={() => console.log("3")}>Имеющийся товар</Button>
+                    <Button className="exit" variant="outlined" onClick={props.handleClose}>Закрыть</Button>
+                    <Button className="button-all" variant="contained" onClick={() => handleDownload('all')}>Все товары (имеющиеся, законченные, отключенные и тд)</Button>
+                    <Button className="button-need" variant="contained" onClick={() => handleDownload('need')}>Необходимый товар к следующей покупке</Button>
+                    <Button className="button-have" variant="contained" onClick={() => handleDownload('have')}>Имеющийся товар</Button>
                 </Box>
             </Modal>
         </React.Fragment>

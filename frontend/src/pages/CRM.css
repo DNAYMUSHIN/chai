@@ -57,6 +57,7 @@
     cursor: pointer;
     display: flex;
     justify-content: start;
+    font-size: 0.8rem;
 }
 
 .crm__aside-logout {
@@ -66,12 +67,13 @@
 
 
 
-.crm__nav-item:hover {
+/*.crm__nav-item:hover {
     background-color: rgba(0, 0, 0, 0.04);
-}
+}*/
 
 
 @media screen and (max-width: 768px) {
+
     .crm {
         display: flex;
         flex-direction: column;
@@ -88,13 +90,23 @@
         justify-content: center;
         position: relative;
         border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+        padding: 2rem;
     }
 
-    .crm__aside-main{
+    .crm__aside-main {
         justify-content: center;
         align-items: center;
         text-align: center;
+        gap: 1rem;
+        padding: 0;
     }
+
+    .crm__logo {
+        align-self: start;
+        font-size: 2rem;
+        line-height: 1;
+    }
+
     .crm__nav {
         width: 100%;
     }
@@ -115,7 +127,42 @@
 
     .crm__aside-logout {
         width: auto;
-        margin-top: 1rem;
+        position: absolute;
+        right: 2rem;
+        top: 2rem;
+        margin: 0;
+        padding: 0;
+        height: 2rem;
+        display: flex;
+        align-items: center;
     }
 
+    .crm__aside-logout button {
+        height: 2rem;
+        text-transform: uppercase;
+    }
+
+    .crm__main {
+        padding: 1rem 2rem;
+    }
+}
+
+@media screen and (max-width: 768px) {
+    .crm__nav-list {
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 0.5rem 1rem;
+    }
+}
+
+@media screen and (max-width: 420px) {
+    .crm__main {
+        padding: 1rem;
+    }
+}
+
+@media screen and (max-width: 330px) {
+    .crm__nav-list {
+        gap: 0.5rem;
+    }
 }

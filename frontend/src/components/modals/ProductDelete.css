@@ -1,0 +1,40 @@
+.product-popup {
+    display: grid;
+    padding: 2rem;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-areas: "title title exit" "warning warning warning" "delete delete delete";
+    align-items: center;
+    gap: 1rem 0;
+
+    max-width: 600px;
+
+    h2 {
+        grid-area: title;
+        font-size: 1.5rem;
+        line-height: 1;
+        margin: 0;
+    }
+
+    .exit {
+        grid-area: exit;
+        height: 2rem;
+    }
+
+}
+
+.product-popup__warning {
+    grid-area: warning;
+    text-align: center;
+    margin: 0;
+}
+
+.button-all {
+    grid-area: delete;
+}
+
+@media screen and (max-width: 660px) {
+    .product-popup {
+        text-align: center;
+        grid-template-areas: "title title title" "exit exit exit" "warning warning warning" "delete delete delete";
+    }
+}
