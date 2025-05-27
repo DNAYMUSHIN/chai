@@ -29,6 +29,10 @@ router.post('/order/create', adminController.createOrder);
 
 router.get('/orders/', adminController.getOrdersbyStatus)
 
+router.get('/orders/all', adminController.getAllOrders)
+
+router.put('/order/update', adminController.updateOrder);
+
 
 // Route for generating sales reports
 router.get('/report', adminController.generateDailyReport);

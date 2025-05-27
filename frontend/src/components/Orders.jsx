@@ -12,24 +12,26 @@ const Orders = () => {
     const [currentOrder, setCurrentOrder] = useState(null);
     const [actionType, setActionType] = useState('create');
 
+
+    const loadOrders = async () => {
+        setLoading(true);
+        try {
+            // Загружаем только заказы со статусом 0 (активные)
+            /*const response = await fetch('/api/orders/?status=0');*/
+            const response = await fetch('/api/orders/all');
+            if (!response.ok) throw new Error('Ошибка загрузки заказов');
+            const data = await response.json();
+
+            setOrders(data);
+        } catch (err) {
+            setError(err.message);
+            console.error(err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     useEffect(() => {
-        const loadOrders = async () => {
-            setLoading(true);
-            try {
-                // Загружаем только заказы со статусом 0 (активные)
-                const response = await fetch('/api/orders/?status=0');
-                if (!response.ok) throw new Error('Ошибка загрузки заказов');
-                const data = await response.json();
-
-                setOrders(data);
-            } catch (err) {
-                setError(err.message);
-                console.error(err);
-            } finally {
-                setLoading(false);
-            }
-        };
-
         loadOrders();
     }, []);
 
@@ -41,9 +43,31 @@ const Orders = () => {
 
     const handleOpenEdit = (order) => {
         setActionType('edit');
-        setCurrentOrder(order);
+        setCurrentOrder({
+            ...order,
+            items: order.products ? order.products.map(product => {
+                const productId = product.product_id || product.id;
+                if (!productId) {
+                    console.warn("Пропущен товар без product_id", product);
+                    return null;
+                }
+                return {
+                    product_id: productId,
+                    id: productId,
+                    name: product.product_name || product.name || 'Без названия',
+                    price: parseFloat(product.price) || 0,
+                    quantity: product.quantity || 1,
+                    total: parseFloat(product.price) * (product.quantity || 1)
+                };
+            }).filter(Boolean) : []
+        });
         setOpenOrderModal(true);
     };
+    /*const handleOpenEdit = (order) => {
+        setActionType('edit');
+        setCurrentOrder(order);
+        setOpenOrderModal(true);
+    };*/
 
     const handleAddOrder = async (newOrder) => {
         try {
@@ -68,9 +92,10 @@ const Orders = () => {
                 throw new Error(errorData.message || 'Ошибка создания заказа');
             }
 
-            const createdOrder = await response.json();
+           /* const createdOrder = await response.json();
             setOrders(prev => [...prev, createdOrder]);
-
+*/
+            loadOrders();
 
             // Закрываем модальное окно после успешного создания
             setOpenOrderModal(false);
@@ -81,6 +106,32 @@ const Orders = () => {
     };
 
     const handleUpdateOrder = async (updatedOrder) => {
+        try {
+            const response = await fetch('/api/order/update', {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                },
+                body: JSON.stringify({
+                    order_id: updatedOrder.order_id,
+                    status: updatedOrder.status || 0,
+                    products: updatedOrder.items.map(item => ({
+                        product_id: item.product_id,
+                        quantity: parseInt(item.quantity, 10),
+                        price: parseFloat(item.price)
+                    }))
+                })
+            });
+            if (!response.ok) throw new Error('Ошибка обновления заказа');
+            loadOrders();
+            setOpenOrderModal(false);
+        } catch (err) {
+            console.error(err);
+            alert(err.message);
+        }
+    };
+    /*const handleUpdateOrder = async (updatedOrder) => {
         try {
             const response = await fetch('/api/order/status', {
                 method: 'PUT',
@@ -105,7 +156,7 @@ const Orders = () => {
             console.error(err);
             alert(err.message);
         }
-    };
+    };*/
 
     const handleStatusChange = async (orderId, newStatus) => {
         try {
@@ -123,12 +174,14 @@ const Orders = () => {
 
             if (!response.ok) throw new Error('Ошибка обновления статуса');
 
-            const updatedOrder = await response.json();
+            /*const updatedOrder = await response.json();
             setOrders(prev =>
                 prev.map(order =>
                     order.order_id === orderId ? updatedOrder : order
                 )
-            );
+            );*/
+
+            loadOrders();
         } catch (err) {
             console.error(err);
             alert(err.message);

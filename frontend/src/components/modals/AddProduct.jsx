@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Button, FormControlLabel, Input, Modal, Radio, RadioGroup, MenuItem, Select, FormControl, InputLabel } from "@mui/material";
 import "./AddProduct.css";
-import fakeFetchApi from "../../tests/Products.test.js";
 
 const style = {
     position: 'absolute',
@@ -39,7 +38,7 @@ const AddProduct = (props) => {
         const fetchCategories = async () => {
             setLoadingCategories(true);
             try {
-                const response = await fakeFetchApi('/api/categories');
+                const response = await fetch('/api/categories');
                 const data = await response.json();
                 setCategories(data);
             } catch (error) {

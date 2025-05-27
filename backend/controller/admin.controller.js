@@ -377,7 +377,7 @@ async updateOrderStatus(req, res) {
     }
 
     try {
-        const updatedOrder = await db.query(`UPDATE "Order" SET status = $1 WHERE order_id = $2 RETURNING *`, [status, order_id]);
+        const updatedOrder = await db.query(`UPDATE "orders" SET status = $1 WHERE order_id = $2 RETURNING *`, [status, order_id]);
         res.status(200).json({ message: 'Статус заказа обновлен', order: updatedOrder.rows[0] });
     } catch (err) {
         
@@ -385,6 +385,78 @@ async updateOrderStatus(req, res) {
     }
 }
 
+async getAllOrders(req, res) {
+    try {
+        const ordersResult = await db.query(`
+    SELECT o.*, 
+           json_agg(json_build_object(
+               'product_id', p.product_id,
+               'product_name', p.product_name,
+               'quantity', oi.quantity,
+               'price', oi.price
+           )) as products
+    FROM Orders o
+    LEFT JOIN OrderItems oi ON o.order_id = oi.order_id
+    LEFT JOIN Product p ON oi.product_id = p.product_id
+    GROUP BY o.order_id
+    ORDER BY o.createdat DESC
+`);
+        res.status(200).json(ordersResult.rows);
+    } catch (err) {
+        console.error(`Error: ${err}`);
+        res.status(500).send("Internal Server Error");
+    }
+}
+
+/*async getAllOrders(req, res) {
+    try {
+        // Получаем все заказы (без фильтрации по статусу)
+        const ordersResult = await db.query(`
+        SELECT o.*, 
+               json_agg(json_build_object(
+                   'product_name', p.product_name,
+                   'quantity', oi.quantity,
+                   'price', oi.price
+               )) as products
+        FROM Orders o
+        LEFT JOIN OrderItems oi ON o.order_id = oi.order_id
+        LEFT JOIN Product p ON oi.product_id = p.product_id
+        GROUP BY o.order_id
+        ORDER BY o.createdat DESC
+    `);
+
+        res.status(200).json(ordersResult.rows);
+    } catch (err) {
+        console.error(`Error: ${err}`);
+        res.status(500).send("Internal Server Error");
+    }
+}*/
+
+async getOrdersbyStatus(req, res) {
+    const { status } = req.query;
+    try {
+        const ordersResult = await db.query(`
+    SELECT o.*, 
+           json_agg(json_build_object(
+               'product_id', p.product_id,  
+               'product_name', p.product_name,
+               'quantity', oi.quantity,
+               'price', oi.price
+           )) as products
+    FROM Orders o
+    LEFT JOIN OrderItems oi ON o.order_id = oi.order_id
+    LEFT JOIN Product p ON oi.product_id = p.product_id
+    WHERE o.status = $1
+    GROUP BY o.order_id
+    ORDER BY o.createdat DESC
+`, [status]);
+        res.status(200).json(ordersResult.rows);
+    } catch (err) {
+        console.error(`Error: ${err}`);
+        res.status(500).send("Internal Server Error");
+    }
+}
+/*
 async getOrdersbyStatus(req, res) {
     const { status } = req.query; // Изменяем с req.body на req.query
 
@@ -409,6 +481,107 @@ async getOrdersbyStatus(req, res) {
     } catch (err) {
         console.error(`Error: ${err}`);
         res.status(500).send("Internal Server Error");
+    }
+}*/
+
+// Редактирование заказа (состава и статуса)
+async updateOrder(req, res) {
+    const { order_id, status, products } = req.body;
+
+    if (!order_id) {
+        return res.status(400).json({ error: 'ID заказа обязательно' });
+    }
+
+    try {
+        // Начинаем транзакцию
+        await db.query('BEGIN');
+
+        // 1. Обновляем статус заказа, если он передан
+        if (status !== undefined) {
+            await db.query(
+                `UPDATE orders SET status = $1 WHERE order_id = $2`,
+                [status, order_id]
+            );
+        }
+
+        // 2. Если передан новый состав заказа
+        if (products && Array.isArray(products)) {
+            // Удаляем старые позиции заказа
+            await db.query(
+                `DELETE FROM orderitems WHERE order_id = $1`,
+                [order_id]
+            );
+
+            // Восстанавливаем остатки по старым позициям
+            const oldItems = await db.query(
+                `SELECT product_id, quantity FROM orderitems WHERE order_id = $1`,
+                [order_id]
+            );
+
+            for (const item of oldItems.rows) {
+                await db.query(
+                    `UPDATE product SET quantity = quantity + $1 
+                 WHERE product_id = $2`,
+                    [item.quantity, item.product_id]
+                );
+            }
+
+            // Добавляем новые позиции и обновляем остатки
+            let total = 0;
+            for (const product of products) {
+                // Добавляем позицию в заказ
+                await db.query(
+                    `INSERT INTO orderitems 
+                 (order_id, product_id, quantity, price) 
+                 VALUES ($1, $2, $3, $4)`,
+                    [order_id, product.product_id, product.quantity, product.price]
+                );
+
+                // Обновляем остатки товара
+                await db.query(
+                    `UPDATE product SET quantity = quantity - $1 
+                 WHERE product_id = $2`,
+                    [product.quantity, product.product_id]
+                );
+
+                total += product.price * product.quantity;
+            }
+
+            // Обновляем общую сумму заказа
+            await db.query(
+                `UPDATE orders SET total = $1 WHERE order_id = $2`,
+                [total, order_id]
+            );
+        }
+
+        // Получаем обновленный заказ с товарами
+        const updatedOrder = await db.query(`
+        SELECT o.*, 
+               json_agg(json_build_object(
+                   'product_name', p.product_name,
+                   'quantity', oi.quantity,
+                   'price', oi.price,
+                   'product_id', p.product_id
+               )) as products
+        FROM Orders o
+        LEFT JOIN OrderItems oi ON o.order_id = oi.order_id
+        LEFT JOIN Product p ON oi.product_id = p.product_id
+        WHERE o.order_id = $1
+        GROUP BY o.order_id
+    `, [order_id]);
+
+        // Завершаем транзакцию
+        await db.query('COMMIT');
+
+        res.status(200).json({
+            message: 'Заказ успешно обновлен',
+            order: updatedOrder.rows[0]
+        });
+    } catch (err) {
+        // Откатываем транзакцию в случае ошибки
+        await db.query('ROLLBACK');
+        console.error('Ошибка при обновлении заказа:', err);
+        res.status(500).json({ error: 'Ошибка сервера при обновлении заказа' });
     }
 }
 

@@ -1,6 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Modal, Box, Button, Input } from "@mui/material";
-
 import "./AddManually.css"
 
 const style = {
@@ -19,6 +18,18 @@ const AddManually = ({ open, onClose, onAddProduct }) => {
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState([]);
     const [loading, setLoading] = useState(false);
+
+    // 🔁 Автоматический поиск при изменении строки поиска
+    useEffect(() => {
+        if (searchQuery.trim()) {
+            const timer = setTimeout(() => {
+                handleSearch();
+            }, 500); // Дебанс на 500 мс
+            return () => clearTimeout(timer);
+        } else {
+            setSearchResults([]);
+        }
+    }, [searchQuery]);
 
     const handleSearch = async () => {
         if (!searchQuery.trim()) {
@@ -54,11 +65,19 @@ const AddManually = ({ open, onClose, onAddProduct }) => {
     };
 
     const handleAddToOrder = (product) => {
+        if (!product.id && !product.product_id) {
+            console.error("Невозможно добавить товар без ID", product);
+            alert("Выбранный товар не имеет корректного ID");
+            return;
+        }
+
         onAddProduct({
-            product_id: product.product_id, // ← Это обязательно
-            id: product.product_id,        // ← Для совместимости с CreateOrder
-            name: product.product_name,
-            price: product.price || product.quantity // Исправлено: price вместо quantity
+            product_id: product.product_id || product.id,
+            id: product.id || product.product_id,
+            name: product.product_name || product.name || 'Неизвестный товар',
+            price: parseFloat(product.price_unit),
+            quantity: 1,
+            total: parseFloat(product.price_unit)
         });
         onClose();
     };
@@ -78,7 +97,6 @@ const AddManually = ({ open, onClose, onAddProduct }) => {
                         placeholder="Поиск товаров..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
                         fullWidth
                     />
                     <Button
@@ -99,7 +117,7 @@ const AddManually = ({ open, onClose, onAddProduct }) => {
                                 <li key={product.product_id} className="search-result-item">
                                     <span>{product.product_name} - {product.quantity} руб.</span>
                                     <Button variant="contained"
-                                        onClick={() => handleAddToOrder(product)}
+                                            onClick={() => handleAddToOrder(product)}
                                     >
                                         Добавить
                                     </Button>

@@ -24,12 +24,29 @@ const CreateOrder = (props) => {
 
     useEffect(() => {
         if (props.order && props.type === 'edit') {
+            // Проверяем разные возможные форматы данных
+            const items = props.order.items ||
+                (props.order.products ? props.order.products.map(p => ({
+                    product_id: p.product_id,
+                    id: p.product_id,
+                    name: p.product_name,
+                    price: p.price,
+                    quantity: p.quantity,
+                    total: p.price * p.quantity
+                })) : []);
+            setOrderItems(items);
+        } else {
+            setOrderItems([]);
+        }
+    }, [props.order, props.type]);
+    /*useEffect(() => {
+        if (props.order && props.type === 'edit') {
             setOrderItems(props.order.items || []);
         } else {
             setOrderItems([]);
         }
     }, [props.order, props.type]);
-
+*/
     const handleAddItem = (product) => {
         const existingItem = orderItems.find(item => item.product_id === product.product_id);
 
@@ -82,8 +99,37 @@ const CreateOrder = (props) => {
     const calculateTotal = () => {
         return orderItems.reduce((sum, item) => sum + item.total, 0);
     };
-
     const handleSubmit = async () => {
+        const orderData = {
+            order_id: props.order?.order_id, // Добавляем ID для редактирования
+            status: props.order?.status || 0, // Статус по умолчанию
+            items: orderItems.map(item => {
+                const productId = item.product_id || item.id;
+                if (!productId) {
+                    console.error("Ошибка: product_id не найден у товара", item);
+                    throw new Error("Нельзя отправить товар без product_id");
+                }
+                return {
+                    product_id: productId,
+                    quantity: item.quantity,
+                    price: parseFloat(item.price) || 0
+                };
+            }),
+            total: calculateTotal()
+        };
+
+        try {
+            if (props.type === 'create') {
+                await props.onAdd(orderData);
+            } else {
+                await props.onUpdate(orderData);
+            }
+            setOrderItems([]);
+        } catch (error) {
+            console.error("Ошибка при обработке заказа:", error);
+        }
+    };
+    /*const handleSubmit = async () => {
         const orderData = {
             items: orderItems.map(item => ({
                 product_id: item.product_id || item.id,
@@ -107,7 +153,7 @@ const CreateOrder = (props) => {
             console.error("Ошибка при обработке заказа:", error);
         }
     };
-
+*/
     return (
         <Modal
             open={props.open}
