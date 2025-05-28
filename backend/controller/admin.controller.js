@@ -617,6 +617,35 @@ async getOrdersbyStatus(req, res){
     }
 }*/
 
+// Поиск товара по штрих-коду
+    async getProductByBarcode(req, res) {
+        const { code } = req.params;
+        try {
+            const result = await db.query(
+                `SELECT * FROM Product WHERE product_id = $1`,
+                [code]
+            );
+
+            if (result.rows.length === 0) {
+                return res.status(404).json({ message: "Товар не найден" });
+            }
+
+            res.status(200).json(result.rows[0]);
+        } catch (err) {
+            console.error("Ошибка поиска по штрих-коду:", err);
+            res.status(500).json({ error: "Ошибка сервера" });
+        }
+    }
+
+
+
+
+
+
+
+
+
+
 
 // Генерация отчета за день.
 async generateDailyReport(req, res){

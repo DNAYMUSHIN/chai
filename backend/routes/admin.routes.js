@@ -45,7 +45,7 @@ router.delete('/categories/:id', adminController.deleteCategory);
 //router.post('/order/create-barcode', adminController.createOrderWithBarcode);
 
 
-
+router.get('/product/barcode/:code', adminController.getProductByBarcode);
 
 
 

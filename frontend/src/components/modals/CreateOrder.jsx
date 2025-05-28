@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Box, Button, Modal, Input } from "@mui/material";
 import "./CreateOrder.css";
 import AddManually from "./AddManually.jsx";
@@ -21,10 +21,11 @@ const style = {
 const CreateOrder = (props) => {
     const [orderItems, setOrderItems] = useState([]);
     const [openManualAdd, setOpenManualAdd] = useState(false);
+    const [scanning, setScanning] = useState(false);
+    const barcodeInputRef = useRef(null);
 
     useEffect(() => {
         if (props.order && props.type === 'edit') {
-            // Проверяем разные возможные форматы данных
             const items = props.order.items ||
                 (props.order.products ? props.order.products.map(p => ({
                     product_id: p.product_id,
@@ -39,17 +40,10 @@ const CreateOrder = (props) => {
             setOrderItems([]);
         }
     }, [props.order, props.type]);
-    /*useEffect(() => {
-        if (props.order && props.type === 'edit') {
-            setOrderItems(props.order.items || []);
-        } else {
-            setOrderItems([]);
-        }
-    }, [props.order, props.type]);
-*/
-    const handleAddItem = (product) => {
-        const existingItem = orderItems.find(item => item.product_id === product.product_id);
 
+    const handleAddItem = (product) => {
+
+        const existingItem = orderItems.find(item => item.product_id === product.product_id);
         if (existingItem) {
             setOrderItems(prev =>
                 prev.map(item =>
@@ -57,7 +51,7 @@ const CreateOrder = (props) => {
                         ? {
                             ...item,
                             quantity: item.quantity + 1,
-                            total: (parseInt(item.price) * (item.quantity + 1))
+                            total: parseInt(item.price) * (item.quantity + 1)
                         }
                         : item
                 )
@@ -68,7 +62,7 @@ const CreateOrder = (props) => {
                 {
                     ...product,
                     quantity: 1,
-                    total: parseInt(product.price)
+                    total: parseInt(product.price) || 0
                 }
             ]);
         }
@@ -80,7 +74,6 @@ const CreateOrder = (props) => {
 
     const handleQuantityChange = (itemId, newQuantity) => {
         if (newQuantity < 1) return;
-
         setOrderItems(prev =>
             prev.map(item => {
                 if (item.product_id === itemId) {
@@ -99,10 +92,11 @@ const CreateOrder = (props) => {
     const calculateTotal = () => {
         return orderItems.reduce((sum, item) => sum + item.total, 0);
     };
+
     const handleSubmit = async () => {
         const orderData = {
-            order_id: props.order?.order_id, // Добавляем ID для редактирования
-            status: props.order?.status || 0, // Статус по умолчанию
+            order_id: props.order?.order_id,
+            status: props.order?.status || 0,
             items: orderItems.map(item => {
                 const productId = item.product_id || item.id;
                 if (!productId) {
@@ -129,40 +123,81 @@ const CreateOrder = (props) => {
             console.error("Ошибка при обработке заказа:", error);
         }
     };
-    /*const handleSubmit = async () => {
-        const orderData = {
-            items: orderItems.map(item => ({
-                product_id: item.product_id || item.id,
-                quantity: item.quantity,
-                price: parseInt(item.price)
-            })),
-            total: calculateTotal()
+
+    // Сканер штрих-кодов
+
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            // Активируем сканирование только при нажатии определённой клавиши (например, Ctrl)
+            if (props.open /*&& !scanning && e.ctrlKey*/) {
+                setScanning(true);
+                if (barcodeInputRef.current) {
+                    barcodeInputRef.current.focus();
+                }
+            }
         };
 
-        try {
-            if (props.type === 'create') {
-                await props.onAdd(orderData); // Ждем завершения
-                setOrderItems([]); // Очищаем список товаров
-            } else {
-                await props.onUpdate({
-                    ...props.order,
-                    ...orderData
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [props.open, scanning]);
+
+        const handleBarcodeChange = async (e) => {
+            const code = e.target.value.trim();
+            if (code.length < 6) return;
+
+            try {
+                const response = await fetch(`/api/product/barcode/${code}`);
+                if (!response.ok) {
+                    throw new Error("Товар не найден");
+                }
+
+                const product = await response.json();
+
+                // Добавляем проверку на существование продукта и его свойств
+                if (!product || !product.product_id) {
+                    throw new Error("Неверный формат данных товара");
+                }
+
+                handleAddItem({
+                    product_id: product.product_id,
+                    id: product.product_id,
+                    name: product.product_name || "Неизвестный товар",
+                    price: product.price_unit || 0,
+                    quantity: 1,
+                    total: product.price_unit || 0
                 });
+
+                e.target.value = '';
+            } catch (err) {
+                console.error("Ошибка сканирования:", err.message);
+                alert(err.message || "Произошла ошибка при сканировании");
+            } finally {
+                // Добавляем небольшую задержку перед сбросом состояния сканирования
+                setTimeout(() => setScanning(false), 500);
             }
-        } catch (error) {
-            console.error("Ошибка при обработке заказа:", error);
-        }
-    };
-*/
+        };
+
+
+
     return (
         <Modal
             open={props.open}
             onClose={props.handleClose}
             aria-labelledby="child-modal-title"
             aria-describedby="child-modal-description"
-            sx={{ zIndex: 5 }}
+            sx={{zIndex: 5}}
         >
             <Box sx={style} className="popup__create-add-order">
+                {/*Проблемы с инпутом*/}
+                <input
+                    type="text"
+                    ref={barcodeInputRef}
+                    onChange={handleBarcodeChange}
+                    autoComplete="off"
+                    style={{position: 'absolute', top: "0", width: '100px', height: '100px'}}
+                />
+
+
                 <AddManually
                     open={openManualAdd}
                     onClose={() => setOpenManualAdd(false)}
@@ -175,6 +210,7 @@ const CreateOrder = (props) => {
                             <span className="create__item">Создание</span> :
                             <span className="change__item">Редактирование</span>} заказа
                     </h1>
+
                     <div className="create-order__button-wrapper">
                         <Button
                             onClick={props.handleClose}
@@ -185,6 +221,7 @@ const CreateOrder = (props) => {
                                 <span className="create__item">создание</span> :
                                 <span className="change__item">редактирование</span>}
                         </Button>
+
                         <Button
                             onClick={() => setOpenManualAdd(true)}
                             className="create-order__button button create-order__button-add-manually"
@@ -192,6 +229,7 @@ const CreateOrder = (props) => {
                             Добавить вручную
                         </Button>
                     </div>
+
                     <ul className="features">
                         <li className="titles__title">Наименование</li>
                         <li className="titles__title">Цена за ед.</li>
@@ -202,7 +240,7 @@ const CreateOrder = (props) => {
                 </div>
 
                 <div className="popup__main">
-                {orderItems.length === 0 ? (
+                    {orderItems.length === 0 ? (
                         <div className="empty-order">Добавьте товары в заказ</div>
                     ) : (
                         <ol className="create-order__main-list">
