@@ -37,6 +37,7 @@ router.put('/order/update', adminController.updateOrder);
 // Route for generating sales reports
 router.get('/report', adminController.generateDailyReport);
 
+// Работа с категориями
 router.post('/categories', adminController.createCategory);
 router.get('/categories', adminController.getAllCategories);
 router.delete('/categories/:id', adminController.deleteCategory);
@@ -44,19 +45,17 @@ router.delete('/categories/:id', adminController.deleteCategory);
 // Route for creating an order via barcode scanning
 //router.post('/order/create-barcode', adminController.createOrderWithBarcode);
 
-
+// Штрих код поиск
 router.get('/product/barcode/:code', adminController.getProductByBarcode);
-
 
 
 // Route for generating sales reports
 router.post('/reportProduct', adminController.generateProductReport);
 
-
-
+// Тестовый путь
 router.get('/number', (req, res) => {  // Добавлены req, res
     const randomNumber = Math.floor(Math.random() * 100);
-    res.json({ number: randomNumber });            
+    res.json({number: randomNumber});
 });
 
 

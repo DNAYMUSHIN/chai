@@ -2,7 +2,7 @@
     width: 100%;
 }
 
-.popup__create-add .popup__header{
+.popup__create-add .popup__header {
     display: flex;
     width: 100%;
     justify-content: space-between;
@@ -41,6 +41,12 @@
     align-items: center;
 }
 
+.hover-info {
+    font-size: 1.2rem;
+    font-family: Lato, sans-serif;
+    margin: 0;
+}
+
 @media screen and (max-width: 1250px) {
 
     .create__form-inner-wrapper {
@@ -63,6 +69,7 @@
         flex-direction: column;
         text-align: center;
     }
+
     .button-create-wrapper {
         display: flex;
         width: 100%;
@@ -70,3 +77,4 @@
         justify-content: center;
     }
 }
+

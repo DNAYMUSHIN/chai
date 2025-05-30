@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Box, Button, Modal, Input } from "@mui/material";
+import React, {useState, useEffect, useRef} from 'react';
+import {Box, Button, Modal, Input} from "@mui/material";
 import "./CreateOrder.css";
 import AddManually from "./AddManually.jsx";
 
@@ -141,42 +141,41 @@ const CreateOrder = (props) => {
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [props.open, scanning]);
 
-        const handleBarcodeChange = async (e) => {
-            const code = e.target.value.trim();
-            if (code.length < 6) return;
+    const handleBarcodeChange = async (e) => {
+        const code = e.target.value.trim();
+        if (code.length < 6) return;
 
-            try {
-                const response = await fetch(`/api/product/barcode/${code}`);
-                if (!response.ok) {
-                    throw new Error("Товар не найден");
-                }
-
-                const product = await response.json();
-
-                // Добавляем проверку на существование продукта и его свойств
-                if (!product || !product.product_id) {
-                    throw new Error("Неверный формат данных товара");
-                }
-
-                handleAddItem({
-                    product_id: product.product_id,
-                    id: product.product_id,
-                    name: product.product_name || "Неизвестный товар",
-                    price: product.price_unit || 0,
-                    quantity: 1,
-                    total: product.price_unit || 0
-                });
-
-                e.target.value = '';
-            } catch (err) {
-                console.error("Ошибка сканирования:", err.message);
-                alert(err.message || "Произошла ошибка при сканировании");
-            } finally {
-                // Добавляем небольшую задержку перед сбросом состояния сканирования
-                setTimeout(() => setScanning(false), 500);
+        try {
+            const response = await fetch(`/api/product/barcode/${code}`);
+            if (!response.ok) {
+                throw new Error("Товар не найден");
             }
-        };
 
+            const product = await response.json();
+
+            // Добавляем проверку на существование продукта и его свойств
+            if (!product || !product.product_id) {
+                throw new Error("Неверный формат данных товара");
+            }
+
+            handleAddItem({
+                product_id: product.product_id,
+                id: product.product_id,
+                name: product.product_name || "Неизвестный товар",
+                price: product.price_unit || 0,
+                quantity: 1,
+                total: product.price_unit || 0
+            });
+
+            e.target.value = '';
+        } catch (err) {
+            console.error("Ошибка сканирования:", err.message);
+            alert(err.message || "Произошла ошибка при сканировании");
+        } finally {
+            // Добавляем небольшую задержку перед сбросом состояния сканирования
+            setTimeout(() => setScanning(false), 500);
+        }
+    };
 
 
     return (
@@ -196,7 +195,6 @@ const CreateOrder = (props) => {
                     autoComplete="off"
                     style={{position: 'absolute', top: "0", width: '100px', height: '100px'}}
                 />
-
 
                 <AddManually
                     open={openManualAdd}

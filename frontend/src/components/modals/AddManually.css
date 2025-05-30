@@ -34,11 +34,11 @@
 }
 
 
-
 @media screen and (max-width: 800px) {
     .add-manually-modal {
         width: 85vw;
     }
+
     .modal-actions {
         margin-top: 1rem;
         display: flex;

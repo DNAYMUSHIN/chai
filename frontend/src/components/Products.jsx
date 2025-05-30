@@ -88,9 +88,10 @@ const Products = () => {
                 return {
                     id: product.product_id,
                     name: product.product_name,
-                    status: product.product_status === 1 ? 'В наличии' : 'Нет в наличии',
-                    price: `${product.price_unit} руб.${product.product_type === 2 ? ' за 100г' : ''}`,
-                    unit: product.product_type === 1 ? '1 шт.' : `${product.quantity} г`,
+                    status: product.product_status === 1 ? 'В наличии' :
+                        product.product_status === 0 ? 'Нет в наличии' : "К закупке",
+                    price: `${product.price_unit} руб.${product.product_type === 2 ? ` за ${product.price_for_grams} г` : ''}`,
+                    unit: product.product_type === 1 ? '1 шт.' : `100 г`,
                     amount: `${product.quantity} ${product.product_type === 1 ? 'шт.' : 'г'}`,
                     category: category ? category.category_name : 'Без категории',
                     rawData: product
@@ -138,7 +139,7 @@ const Products = () => {
                         id: product.product_id,
                         name: product.product_name,
                         status: product.product_status === 1 ? 'В наличии' : 'Нет в наличии',
-                        price: `${product.price_unit} руб.${product.product_type === 2 ? ' за 100г' : ''}`,
+                        price: `${product.price_unit} руб.${product.product_type === 2 ? ` за ${product.price_for_grams} г` : ''}`,
                         unit: product.product_type === 1 ? '1 шт.' : `${product.quantity} г`,
                         amount: `${product.quantity} ${product.product_type === 1 ? 'шт.' : 'г'}`,
                         category: category ? category.category_name : 'Без категории',

@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Modal, Box, Button, Input } from "@mui/material";
+import React, {useState, useEffect} from 'react';
+import {Modal, Box, Button, Input} from "@mui/material";
 import "./AddManually.css"
 
 const style = {
@@ -14,12 +14,12 @@ const style = {
     p: 4,
 };
 
-const AddManually = ({ open, onClose, onAddProduct }) => {
+const AddManually = ({open, onClose, onAddProduct}) => {
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState([]);
     const [loading, setLoading] = useState(false);
 
-    // 🔁 Автоматический поиск при изменении строки поиска
+    // Автоматический поиск при изменении строки поиска
     useEffect(() => {
         if (searchQuery.trim()) {
             const timer = setTimeout(() => {
@@ -45,7 +45,7 @@ const AddManually = ({ open, onClose, onAddProduct }) => {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${localStorage.getItem('token')}`
                 },
-                body: JSON.stringify({ query: searchQuery })
+                body: JSON.stringify({query: searchQuery})
             });
 
             if (!response.ok) {

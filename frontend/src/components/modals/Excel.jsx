@@ -25,7 +25,7 @@ const Excel = (props) => {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${localStorage.getItem('token')}` // если используется авторизация
                 },
-                body: JSON.stringify({ status })
+                body: JSON.stringify({status})
             });
 
             if (!response.ok) {
@@ -49,6 +49,7 @@ const Excel = (props) => {
 
         } catch (error) {
             console.error('Error downloading file:', error);
+            alert('Ошибка скачивания файла: ' + error);
         }
     };
 
@@ -60,12 +61,15 @@ const Excel = (props) => {
                 aria-labelledby="child-modal-title"
                 aria-describedby="child-modal-description"
             >
-                <Box sx={{ ...style, width: "80vw"}} className="excel-popup">
+                <Box sx={{...style, width: "80vw"}} className="excel-popup">
                     <h2 id="child-modal-title" className="title">Выгрузка в Excel</h2>
                     <Button className="exit" variant="outlined" onClick={props.handleClose}>Закрыть</Button>
-                    <Button className="button-all" variant="contained" onClick={() => handleDownload('all')}>Все товары (имеющиеся, законченные, отключенные и тд)</Button>
-                    <Button className="button-need" variant="contained" onClick={() => handleDownload('need')}>Необходимый товар к следующей покупке</Button>
-                    <Button className="button-have" variant="contained" onClick={() => handleDownload('have')}>Имеющийся товар</Button>
+                    <Button className="button-all" variant="contained" onClick={() => handleDownload('all')}>Все товары
+                        (имеющиеся, законченные, отключенные и тд)</Button>
+                    <Button className="button-need" variant="contained" onClick={() => handleDownload('need')}>Необходимый
+                        товар к следующей покупке</Button>
+                    <Button className="button-have" variant="contained" onClick={() => handleDownload('have')}>Имеющийся
+                        товар</Button>
                 </Box>
             </Modal>
         </React.Fragment>

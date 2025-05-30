@@ -16,7 +16,7 @@ const style = {
     pb: 3,
 };
 
-const CategoriesWarning = ({ open, handleClose, onConfirm }) => {
+const CategoriesWarning = ({open, handleClose, onConfirm}) => {
     return (
         <React.Fragment>
             <Modal
@@ -25,11 +25,12 @@ const CategoriesWarning = ({ open, handleClose, onConfirm }) => {
                 aria-labelledby="child-modal-title"
                 aria-describedby="child-modal-description"
             >
-                <Box sx={{ ...style, width: "80vw"}} className="categories-popup">
+                <Box sx={{...style, width: "80vw"}} className="categories-popup">
                     <h2 id="child-modal-title" className="title">Удаление категории</h2>
                     <Button className="exit" variant="outlined" onClick={handleClose}>Вернуться</Button>
-                    <p className="categories-popup__warning">Вы уверены? Все товары данной категории будут перемещены в "Без категории"</p>
-                    <Button className="button-all" variant="contained"  onClick={onConfirm}>Удалить</Button>
+                    <p className="categories-popup__warning">Вы уверены? Все товары данной категории будут перемещены в
+                        "Без категории"</p>
+                    <Button className="button-all" variant="contained" onClick={onConfirm}>Удалить</Button>
                 </Box>
             </Modal>
         </React.Fragment>

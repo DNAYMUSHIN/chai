@@ -1,5 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Button, FormControlLabel, Input, Modal, Radio, RadioGroup, MenuItem, Select, FormControl, InputLabel } from "@mui/material";
+import {
+    Box,
+    Button,
+    FormControlLabel,
+    Input,
+    Modal,
+    Radio,
+    RadioGroup,
+    MenuItem,
+    Select,
+    FormControl,
+    InputLabel
+} from "@mui/material";
 import "./AddProduct.css";
 
 const style = {
@@ -24,7 +36,8 @@ const AddProduct = (props) => {
         product_category_id: '',
         product_type: 'шт',
         product_price_unit: '0',
-        quinity: '0',
+        quantity: '0',
+        price_for_grams: '100',
         product_count_min: '0',
         product_price_min: '0',
         product_code: ''
@@ -33,7 +46,7 @@ const AddProduct = (props) => {
     const [categories, setCategories] = useState([]);
     const [loadingCategories, setLoadingCategories] = useState(false);
 
-    // Загрузка категорий при монтировании
+    // Загрузка категорий
     useEffect(() => {
         const fetchCategories = async () => {
             setLoadingCategories(true);
@@ -47,7 +60,6 @@ const AddProduct = (props) => {
                 setLoadingCategories(false);
             }
         };
-
         fetchCategories();
     }, []);
 
@@ -59,11 +71,12 @@ const AddProduct = (props) => {
                 product_name: product.product_name,
                 product_category_id: product.product_category_id?.toString() || '',
                 product_type: product.product_type === 1 ? 'шт' : 'гр',
-                product_price_unit: product.price_unit.toString(),
-                quinity: product.quantity.toString(),
+                product_price_unit: product.price_unit?.toString() || '0',
+                quantity: product.quantity?.toString() || '0',
+                price_for_grams: product.price_for_grams?.toString() || '100',
                 product_count_min: product.product_count_min?.toString() || '0',
                 product_price_min: product.product_price_min?.toString() || '0',
-                product_code: product.product_code || ''
+                product_code: product.product_code?.toString() || ''
             });
         } else {
             setFormData({
@@ -71,7 +84,8 @@ const AddProduct = (props) => {
                 product_category_id: '',
                 product_type: 'шт',
                 product_price_unit: '0',
-                quinity: '0',
+                quantity: '0',
+                price_for_grams: '100',
                 product_count_min: '0',
                 product_price_min: '0',
                 product_code: ''
@@ -81,11 +95,14 @@ const AddProduct = (props) => {
 
     const handleChange = (e) => {
         const { name, value } = e.target;
+
         const numericFields = [
             'product_price_unit',
-            'quinity',
+            'quantity',
+            'price_for_grams',
             'product_count_min',
-            'product_price_min'
+            'product_price_min',
+            'product_code'
         ];
 
         if (numericFields.includes(name)) {
@@ -101,50 +118,96 @@ const AddProduct = (props) => {
         setFormData(prev => ({
             ...prev,
             product_type: type,
-            product_price_unit: '0'
+            product_price_unit: '0',
+            ...(type === 'шт' ? {} : { price_for_grams: '100' })
         }));
+    };
+
+    const handleFocus = (e) => {
+        const { name, value } = e.target;
+
+        const defaultValues = {
+            product_price_unit: '0',
+            quantity: '0',
+            price_for_grams: '100',
+            product_count_min: '0',
+            product_price_min: '0',
+            product_code: '0'
+        };
+
+        if (defaultValues[name] && value === defaultValues[name]) {
+            setFormData(prev => ({ ...prev, [name]: '' }));
+        }
+    };
+
+    const handleBlur = (e) => {
+        const { name, value } = e.target;
+
+        const defaultValues = {
+            product_price_unit: '0',
+            quantity: '0',
+            price_for_grams: '100',
+            product_count_min: '0',
+            product_price_min: '0',
+            product_code: '0'
+        };
+
+        if (defaultValues[name] && value === '') {
+            setFormData(prev => ({ ...prev, [name]: defaultValues[name] }));
+        }
     };
 
     const handleSubmit = (e) => {
         e.preventDefault();
 
-        // Находим название категории по ID
         const selectedCategory = categories.find(c => c.category_id.toString() === formData.product_category_id);
-        const categoryName = selectedCategory ? selectedCategory.category_name : '';
+        const categoryName = selectedCategory?.category_name || '';
+
+        const submissionData = {
+            product_name: formData.product_name,
+            product_category: categoryName,
+            product_type: formData.product_type === 'шт' ? 1 : 2,
+            product_price_unit: parseFloat(formData.product_price_unit) || 0,
+            quantity: parseFloat(formData.quantity) || 0,
+            price_for_grams: formData.product_type === 'гр' ? parseInt(formData.price_for_grams) || 100 : null,
+            product_count_min: parseFloat(formData.product_count_min) || 0,
+            product_price_min: parseFloat(formData.product_price_min) || 0,
+            product_code: parseInt(formData.product_code) || null
+        };
 
         if (props.type === 'add') {
-            // Логика для добавления (оставляем как есть)
-            const submissionData = {
-                product_name: formData.product_name,
-                product_category: categoryName,
-                product_type: formData.product_type === 'шт' ? 1 : 2,
-                product_price_unit: parseFloat(formData.product_price_unit) || 0,
-                quinity: parseFloat(formData.quinity) || 0,
-                product_count_min: parseFloat(formData.product_count_min) || 0,
-                product_price_min: parseFloat(formData.product_price_min) || 0,
-                product_code: parseInt(formData.product_code || '')
-            };
             props.onAdd(submissionData);
         } else {
-            // Логика для редактирования
             const originalProduct = props.product.rawData;
             const updates = {};
 
-            // Проверяем каждое поле на изменения
             if (formData.product_name !== originalProduct.product_name)
                 updates.product_name = formData.product_name;
 
             if (formData.product_category_id !== originalProduct.product_category_id?.toString())
-                updates.product_category = categoryName; // Отправляем название категории
+                updates.product_category = categoryName;
 
-            if ((formData.product_type === 'шт' ? 1 : 2) !== originalProduct.product_type)
-                updates.product_type = formData.product_type === 'шт' ? 1 : 2;
+            const newType = formData.product_type === 'шт' ? 1 : 2;
+            if (newType !== originalProduct.product_type)
+                updates.product_type = newType;
 
             if (parseFloat(formData.product_price_unit) !== originalProduct.price_unit)
                 updates.price_unit = parseFloat(formData.product_price_unit) || 0;
 
-            if (parseFloat(formData.quinity) !== originalProduct.quantity)
-                updates.quantity = parseFloat(formData.quinity) || 0;
+            if (parseFloat(formData.quantity) !== originalProduct.quantity)
+                updates.quantity = parseFloat(formData.quantity) || 0;
+
+            if (formData.product_type === 'гр') {
+                const newPriceForGrams = parseInt(formData.price_for_grams);
+                if (!isNaN(newPriceForGrams) && newPriceForGrams !== originalProduct.price_for_grams) {
+                    updates.price_for_grams = newPriceForGrams;
+                }
+            } else {
+                // Если тип шт — явно ставим price_for_grams = null
+                if (originalProduct.price_for_grams !== null) {
+                    updates.price_for_grams = null;
+                }
+            }
 
             props.onUpdate(updates);
         }
@@ -159,23 +222,28 @@ const AddProduct = (props) => {
             aria-labelledby="child-modal-title"
             aria-describedby="child-modal-description"
         >
-            <Box sx={{ ...style }} className="popup__create-add">
+            <Box sx={{...style}} className="popup__create-add">
                 <div className="popup__header">
                     <h2 className="popup__title">
-                        {props.type === "add" ?
-                            <span className="create__item">Создание</span> :
-                            <span className="change__item">Редактирование</span>} товара
+                        {props.type === "add" ? (
+                            <span className="create__item">Создание</span>
+                        ) : (
+                            <span className="change__item">Редактирование</span>
+                        )} товара
                     </h2>
                     <div className="create-order__button-wrapper">
                         <Button onClick={props.handleClose} className="create-order__button button create-order__button-reject">
-                            Отменить&#160;
-                            {props.type === "add" ?
-                                <span className="create__item">создание</span> :
-                                <span className="change__item">редактирование</span>}
+                            Отменить&nbsp;
+                            {props.type === "add" ? (
+                                <span className="create__item">создание</span>
+                            ) : (
+                                <span className="change__item">редактирование</span>
+                            )}
                         </Button>
                     </div>
-                </div>{/*maxHeight: 'calc(90vh - 120px)', */}
-                <div className="popup__main" style={{ overflowY: 'auto' }}>
+                </div>
+
+                <div className="popup__main">
                     <form className="create__form" onSubmit={handleSubmit}>
                         <div className="create__form-inner-wrapper">
                             <h3 className="create__title">Наименование:</h3>
@@ -204,10 +272,7 @@ const AddProduct = (props) => {
                                 >
                                     <MenuItem value="">Выберите категорию</MenuItem>
                                     {categories.map(category => (
-                                        <MenuItem
-                                            key={category.category_id}
-                                            value={category.category_id}
-                                        >
+                                        <MenuItem key={category.category_id} value={category.category_id}>
                                             {category.category_name}
                                         </MenuItem>
                                     ))}
@@ -217,36 +282,60 @@ const AddProduct = (props) => {
 
                         <div className="create__form-gram-inner-wrapper">
                             <h3 className="create__title">В чем измеряется:</h3>
-                            <div className="create__radio-wrapper">
-                                <RadioGroup
-                                    aria-labelledby="unit-type-group"
-                                    name="product_type"
-                                    value={formData.product_type}
-                                    onChange={handleTypeChange}
-                                    style={{
-                                        display: "flex",
-                                        flexDirection: "row",
-                                    }}
-                                >
-                                    <FormControlLabel value="шт" control={<Radio/>} label="Штука"/>
-                                    <FormControlLabel value="гр" control={<Radio/>} label="Граммы"/>
-                                </RadioGroup>
-                            </div>
+                            <RadioGroup
+                                row
+                                name="product_type"
+                                value={formData.product_type}
+                                onChange={handleTypeChange}
+                            >
+                                <FormControlLabel value="шт" control={<Radio />} label="Штука" />
+                                <FormControlLabel value="гр" control={<Radio />} label="Граммы" />
+                            </RadioGroup>
 
                             <div className="create__gramm-price">
                                 <div className="create__gramm-text">
-                                    Цена за {formData.product_type === 'шт' ? 'штуку' : '100 грамм'}&#160;
-                                    <Input
-                                        placeholder="0"
-                                        type="text"
-                                        name="product_price_unit"
-                                        className="price-gramm"
-                                        value={formData.product_price_unit}
-                                        onChange={handleChange}
-                                        inputProps={{inputMode: 'numeric', pattern: '[0-9.]*'}}
-                                        required
-                                    />&#160;
-                                    рублей
+                                    {formData.product_type === 'шт' ? (
+                                        <>
+                                            <Input
+                                                placeholder="0"
+                                                type="text"
+                                                name="product_price_unit"
+                                                className="price-gramm"
+                                                value={formData.product_price_unit}
+                                                onChange={handleChange}
+                                                onFocus={handleFocus}
+                                                onBlur={handleBlur}
+                                                inputProps={{ inputMode: 'numeric', pattern: '[0-9.]*' }}
+                                                required
+                                            />&nbsp;рублей за штуку
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Input
+                                                placeholder="0"
+                                                type="text"
+                                                name="product_price_unit"
+                                                className="price-gramm"
+                                                value={formData.product_price_unit}
+                                                onChange={handleChange}
+                                                onFocus={handleFocus}
+                                                onBlur={handleBlur}
+                                                inputProps={{ inputMode: 'numeric', pattern: '[0-9.]*' }}
+                                                required
+                                            />&nbsp;рублей за&nbsp;
+                                            <Input
+                                                placeholder="100"
+                                                type="text"
+                                                name="price_for_grams"
+                                                className="price-gramm"
+                                                value={formData.price_for_grams}
+                                                onChange={handleChange}
+                                                onFocus={handleFocus}
+                                                onBlur={handleBlur}
+                                                inputProps={{ inputMode: 'numeric', pattern: '[0-9]*' }}
+                                            />&nbsp;грамм
+                                        </>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -258,13 +347,16 @@ const AddProduct = (props) => {
                                     <Input
                                         placeholder="0"
                                         type="text"
-                                        name="quinity"
+                                        name="quantity"
                                         className="price-gramm"
-                                        value={formData.quinity}
+                                        value={formData.quantity}
                                         onChange={handleChange}
+                                        onFocus={handleFocus}
+                                        onBlur={handleBlur}
                                         required
-                                        inputProps={{inputMode: 'numeric', pattern: '[0-9.]*'}}
+                                        inputProps={{ inputMode: 'numeric', pattern: '[0-9.]*' }}
                                     />
+                                    &nbsp;
                                     {formData.product_type === 'шт' ? 'штук' : 'грамм'}
                                 </div>
                             </div>
@@ -279,12 +371,14 @@ const AddProduct = (props) => {
                                 className="search"
                                 value={formData.product_count_min}
                                 onChange={handleChange}
-                                inputProps={{inputMode: 'numeric', pattern: '[0-9.]*'}}
+                                onFocus={handleFocus}
+                                onBlur={handleBlur}
+                                inputProps={{ inputMode: 'numeric', pattern: '[0-9.]*' }}
                             />
                         </div>
 
                         <div className="create__form-inner-wrapper">
-                            <h3 className="create__title">Минимальная цена:</h3>
+                            <h3 className="create__title">Цена к закупке:</h3>
                             <Input
                                 placeholder="0"
                                 type="text"
@@ -292,18 +386,19 @@ const AddProduct = (props) => {
                                 className="search"
                                 value={formData.product_price_min}
                                 onChange={handleChange}
-                                inputProps={{inputMode: 'numeric', pattern: '[0-9.]*'}}
+                                onFocus={handleFocus}
+                                onBlur={handleBlur}
+                                inputProps={{ inputMode: 'numeric', pattern: '[0-9.]*' }}
                             />
                         </div>
 
                         <div className="button-create-wrapper">
-                        <Button
-                                type="submit"
-                                className="create-order__button button button-create"
-                            >
-                                {props.type === "add" ?
-                                    <span className="create__item">Создать товар</span> :
-                                    <span className="change__item">Подтвердить редактирование</span>}
+                            <Button type="submit" className="create-order__button button button-create">
+                                {props.type === "add" ? (
+                                    <span className="create__item">Создать товар</span>
+                                ) : (
+                                    <span className="change__item">Подтвердить редактирование</span>
+                                )}
                             </Button>
                         </div>
                     </form>
