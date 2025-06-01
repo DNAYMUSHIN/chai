@@ -344,6 +344,32 @@ class adminController {
         }
     }
 
+
+    async deleteOrder(req, res) {
+        const { order_id } = req.body;
+
+        if (!order_id) {
+            return res.status(400).json({ error: "Не указан order_id" });
+        }
+
+        try {
+            // Удалите сначала OrderItems, чтобы не нарушать внешние ключи
+            await db.query('DELETE FROM orderitems WHERE order_id = $1', [order_id]);
+
+            // Затем удалите сам заказ
+            const result = await db.query('DELETE FROM orders WHERE order_id = $1 RETURNING *', [order_id]);
+
+            if (result.rowCount === 0) {
+                return res.status(404).json({ error: "Заказ не найден" });
+            }
+
+            res.json({ message: "Заказ успешно удален", order: result.rows[0] });
+        } catch (err) {
+            console.error("Ошибка при удалении заказа:", err);
+            res.status(500).json({ error: "Внутренняя ошибка сервера" });
+        }
+    }
+
     // Изменение статуса заказа
     async updateOrderStatus(req, res) {
         const {order_id, status} = req.body;
@@ -364,6 +390,36 @@ class adminController {
     async getAllOrders(req, res) {
         try {
             const ordersResult = await db.query(`
+            SELECT o.*, 
+                   json_agg(json_build_object(
+                       'product_id', p.product_id,
+                       'product_name', p.product_name,
+                       'quantity', oi.quantity,
+                       'price', oi.price,
+
+                       -- Добавляем нужные поля:
+                       'product_type', p.product_type,
+                       'price_for_grams', p.price_for_grams,
+                       'quantityInStock', p.quantity,
+                       'product_count_min', p.product_count_min
+                   )) AS products
+            FROM Orders o
+            LEFT JOIN OrderItems oi ON o.order_id = oi.order_id
+            LEFT JOIN Product p ON oi.product_id = p.product_id
+            GROUP BY o.order_id
+            ORDER BY o.createdat DESC
+        `);
+
+            res.status(200).json(ordersResult.rows);
+        } catch (err) {
+            console.error(`Error fetching all orders: ${err}`);
+            res.status(500).json({ error: "Internal Server Error" });
+        }
+    }
+
+    /*async getAllOrders(req, res) {
+        try {
+            const ordersResult = await db.query(`
     SELECT o.*, 
            json_agg(json_build_object(
                'product_id', p.product_id,
@@ -382,7 +438,7 @@ class adminController {
             console.error(`Error: ${err}`);
             res.status(500).send("Internal Server Error");
         }
-    }
+    }*/
 
     async getOrdersbyStatus(req, res) {
         const {status} = req.query;

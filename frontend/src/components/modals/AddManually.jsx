@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from 'react';
+import React, {useState, useEffect, useRef} from 'react';
 import {Modal, Box, Button, Input} from "@mui/material";
 import "./AddManually.css"
 
@@ -19,12 +19,29 @@ const AddManually = ({open, onClose, onAddProduct}) => {
     const [searchResults, setSearchResults] = useState([]);
     const [loading, setLoading] = useState(false);
 
+    const inputRef = useRef(null);
+
+    console.log(open);
+
+    useEffect(() => {
+        if (open) {
+            // Добавляем небольшую задержку для гарантии рендера модального окна
+            const timer = setTimeout(() => {
+                if (inputRef.current) {
+                    inputRef.current.focus();
+                }
+            }, 100);
+
+            return () => clearTimeout(timer);
+        }
+    }, [open]);
+
     // Автоматический поиск при изменении строки поиска
     useEffect(() => {
         if (searchQuery.trim()) {
             const timer = setTimeout(() => {
                 handleSearch();
-            }, 500); // Дебанс на 500 мс
+            }, 200);
             return () => clearTimeout(timer);
         } else {
             setSearchResults([]);
@@ -65,20 +82,25 @@ const AddManually = ({open, onClose, onAddProduct}) => {
     };
 
     const handleAddToOrder = (product) => {
-        if (!product.id && !product.product_id) {
+        console.log("Добавляем товар в CreateOrder:", product); // <--- Ловим момент передачи
+        if (!product.product_id) {
             console.error("Невозможно добавить товар без ID", product);
             alert("Выбранный товар не имеет корректного ID");
             return;
         }
 
         onAddProduct({
-            product_id: product.product_id || product.id,
-            id: product.id || product.product_id,
-            name: product.product_name || product.name || 'Неизвестный товар',
-            price: parseFloat(product.price_unit),
+            id: product.product_id,
+            name: product.product_name || 'Неизвестный товар',
+            price: product.price_unit || 0,
             quantity: 1,
-            total: parseFloat(product.price_unit)
+            total: product.price_unit || 0,
+            quantityInStock: product.quantity,
+            product_type: product.product_type,
+            price_for_grams: product.price_for_grams,
+            product_count_min: product.product_count_min
         });
+
         onClose();
     };
 
@@ -98,6 +120,7 @@ const AddManually = ({open, onClose, onAddProduct}) => {
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         fullWidth
+                        inputRef={inputRef}
                     />
                     <Button
                         onClick={handleSearch}
@@ -115,7 +138,7 @@ const AddManually = ({open, onClose, onAddProduct}) => {
                         <ul className="search-results">
                             {searchResults.map(product => (
                                 <li key={product.product_id} className="search-result-item">
-                                    <span>{product.product_name} - {product.quantity} руб.</span>
+                                    <span style={{marginRight: "1rem"}}>{product.product_name}</span>
                                     <Button variant="contained"
                                             onClick={() => handleAddToOrder(product)}
                                     >
@@ -123,6 +146,7 @@ const AddManually = ({open, onClose, onAddProduct}) => {
                                     </Button>
                                 </li>
                             ))}
+                            {searchResults.map(product => console.log(product))}
                         </ul>
                     ) : searchQuery ? (
                         <div>Товары не найдены</div>
