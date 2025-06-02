@@ -345,77 +345,98 @@ class adminController {
     }
 
 
-    async deleteOrder(req, res) {
-        const { order_id } = req.body;
-
-        if (!order_id) {
-            return res.status(400).json({ error: "Не указан order_id" });
-        }
-
-        try {
-            // Удалите сначала OrderItems, чтобы не нарушать внешние ключи
-            await db.query('DELETE FROM orderitems WHERE order_id = $1', [order_id]);
-
-            // Затем удалите сам заказ
-            const result = await db.query('DELETE FROM orders WHERE order_id = $1 RETURNING *', [order_id]);
-
-            if (result.rowCount === 0) {
-                return res.status(404).json({ error: "Заказ не найден" });
-            }
-
-            res.json({ message: "Заказ успешно удален", order: result.rows[0] });
-        } catch (err) {
-            console.error("Ошибка при удалении заказа:", err);
-            res.status(500).json({ error: "Внутренняя ошибка сервера" });
-        }
+async deleteOrder(req, res) {
+    const {order_id} = req.body;
+    if (!order_id) {
+        return res.status(400).json({ error: "Не указан order_id" });
     }
 
-    // Изменение статуса заказа
-    async updateOrderStatus(req, res) {
-        const {order_id, status} = req.body;
+    const client = await db.connect(); // Подключаемся к клиенту для транзакций
 
-        if (!order_id || status === undefined) {
-            return res.status(400).json({error: 'Некорректные данные'});
+    try {
+
+        await client.query('BEGIN'); // Начало транзакции
+        const orderProducts = await client.query(`SELECT * FROM orderitems WHERE order_id = $1`, [order_id]);
+
+        await Promise.all(
+            orderProducts.rows.map(async (item) => {
+                await client.query(
+                    `UPDATE product SET quantity = quantity + $1 WHERE product_id = $2`,
+                    [item.quantity, item.product_id]
+                );
+            })
+        );
+
+        // Удалите сначала OrderItems, чтобы не нарушать внешние ключи
+        await client.query('DELETE FROM orderitems WHERE order_id = $1', [order_id]);
+
+
+        // Затем удалите сам заказ
+        const result = await client.query('DELETE FROM orders WHERE order_id = $1 RETURNING *', [order_id]);
+
+        if (result.rowCount === 0) {
+            await client.query('ROLLBACK'); // Откат, если заказа нет
+            return res.status(404).json({ error: "Заказ не найден" });
         }
+        await client.query('COMMIT'); // Фиксация изменений
+        res.json({ message: "Заказ успешно удален", order: result.rows[0] });
+    } catch (err) {
+        await client.query('ROLLBACK'); // Откат при ошибке
+        console.error("Ошибка при удалении заказа:", err);
+        res.status(500).json({ error: "Внутренняя ошибка сервера" });
+    }
+    finally{
+        client.release(); // Освобождаем клиент
 
-        try {
-            const updatedOrder = await db.query(`UPDATE "orders" SET status = $1 WHERE order_id = $2 RETURNING *`, [status, order_id]);
-            res.status(200).json({message: 'Статус заказа обновлен', order: updatedOrder.rows[0]});
-        } catch (err) {
+    }
+}
 
-            res.status(500).json({error: 'Ошибка сервера'});
-        }
+// Изменение статуса заказа
+async updateOrderStatus(req, res) {
+    const {order_id, status} = req.body;
+
+    if (!order_id || status === undefined) {
+        return res.status(400).json({error: 'Некорректные данные'});
     }
 
-    async getAllOrders(req, res) {
-        try {
-            const ordersResult = await db.query(`
-            SELECT o.*, 
-                   json_agg(json_build_object(
-                       'product_id', p.product_id,
-                       'product_name', p.product_name,
-                       'quantity', oi.quantity,
-                       'price', oi.price,
+    try {
+        const updatedOrder = await db.query(`UPDATE "orders" SET status = $1 WHERE order_id = $2 RETURNING *`, [status, order_id]);
+        res.status(200).json({message: 'Статус заказа обновлен', order: updatedOrder.rows[0]});
+    } catch (err) {
 
-                       -- Добавляем нужные поля:
-                       'product_type', p.product_type,
-                       'price_for_grams', p.price_for_grams,
-                       'quantityInStock', p.quantity,
-                       'product_count_min', p.product_count_min
-                   )) AS products
-            FROM Orders o
-            LEFT JOIN OrderItems oi ON o.order_id = oi.order_id
-            LEFT JOIN Product p ON oi.product_id = p.product_id
-            GROUP BY o.order_id
-            ORDER BY o.createdat DESC
-        `);
-
-            res.status(200).json(ordersResult.rows);
-        } catch (err) {
-            console.error(`Error fetching all orders: ${err}`);
-            res.status(500).json({ error: "Internal Server Error" });
-        }
+        res.status(500).json({error: 'Ошибка сервера'});
     }
+}
+
+async getAllOrders(req, res) {
+    try {
+        const ordersResult = await db.query(`
+        SELECT o.*, 
+                json_agg(json_build_object(
+                    'product_id', p.product_id,
+                    'product_name', p.product_name,
+                    'quantity', oi.quantity,
+                    'price', oi.price,
+
+                    -- Добавляем нужные поля:
+                    'product_type', p.product_type,
+                    'price_for_grams', p.price_for_grams,
+                    'quantityInStock', p.quantity,
+                    'product_count_min', p.product_count_min
+                )) AS products
+        FROM Orders o
+        LEFT JOIN OrderItems oi ON o.order_id = oi.order_id
+        LEFT JOIN Product p ON oi.product_id = p.product_id
+        GROUP BY o.order_id
+        ORDER BY o.createdat DESC
+    `);
+
+        res.status(200).json(ordersResult.rows);
+    } catch (err) {
+        console.error(`Error fetching all orders: ${err}`);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+}
 
     /*async getAllOrders(req, res) {
         try {
