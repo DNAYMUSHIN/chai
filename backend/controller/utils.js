@@ -126,6 +126,50 @@ async function generateProduct(products, res, buyer = 'ЧАЙНАЯ ЛАВКА')
   }
 }
 
+
+async function generateReportRevenueForPeriod(orders, products, start, end, res, buyer = "ЧАЙНАЯ ЛАВКА") {
+  try {
+        const workbook = new ExcelJS.Workbook();
+        
+        // 1. Создаем лист со сводкой по заказам
+        const summarySheet = workbook.addWorksheet('Сводка по заказам');
+        summarySheet.columns = [
+            { header: 'Номер заказа', key: 'Номер заказа', width: 20 },
+            { header: 'Дата заказа', key: 'Дата заказа', width: 15 },
+            { header: 'Сумма заказа', key: 'Сумма заказа', width: 15, style: { numFmt: '#,##0.00' } }
+        ];
+        summarySheet.addRows(summaryData);
+        
+        // Добавляем итоговую сумму
+        const totalSum = summaryData.reduce((sum, order) => sum + parseFloat(order["Сумма заказа"]), 0);
+        summarySheet.addRow({
+            "Номер заказа": "ИТОГО:",
+            "Сумма заказа": totalSum
+        });
+        
+        // 2. Создаем лист с детализацией товаров
+        const detailSheet = workbook.addWorksheet('Детализация товаров');
+        detailSheet.columns = [
+            { header: 'Номер заказа', key: 'Номер заказа', width: 20 },
+            { header: 'Название товара', key: 'Название товара', width: 40 },
+            { header: 'Тип товара', key: 'Тип товара', width: 15 },
+            { header: 'Количество', key: 'Количество', width: 12 },
+            { header: 'Цена за единицу', key: 'Цена за единицу', width: 15, style: { numFmt: '#,##0.00' } },
+            { header: 'Сумма', key: 'Сумма', width: 15, style: { numFmt: '#,##0.00' } }
+        ];
+        detailSheet.addRows(detailData);
+        
+        // 3. Записываем книгу в ответ
+        await workbook.xlsx.write(res);
+        res.end();
+        
+    } catch (error) {
+        console.error("Ошибка при генерации Excel:", error);
+        throw error;
+    }
+}
+
+
 async function foo(products, buyer = 'ЧАЙНАЯ ЛАВКА', day) {
 
     const data = new Date()
@@ -182,32 +226,7 @@ async function foo(products, buyer = 'ЧАЙНАЯ ЛАВКА', day) {
     // Заполнение данными из массива products
     fillingcell(worksheet, products)
 
-    /*products.forEach((products, index) => {
-      // Определяем единицы измерения на основе типа товара
-      const unit = products.status === 1 ? 'кг' : 'шт';
-      
-      // Рассчитываем сумму для строки
-      const sum = products.price_unit * products.quantity;
-      totalSum += sum;
-  
-      const row = worksheet.addRow([
-        index + 1,
-        products.order_id,
-        products.a,
-        unit,
-        sum
-      ]);
-  
-      row.eachCell(cell => {
-        cell.border = {
-          top: { style: 'thin' },
-          left: { style: 'thin' },
-          bottom: { style: 'thin' },
-          right: { style: 'thin' }
-        };
-      });
-    });*/
-  
+
     // Итоговая строка
     const totalRowNum = worksheet.rowCount + 1;
     worksheet.mergeCells(`A${totalRowNum}:E${totalRowNum}`);
@@ -268,8 +287,7 @@ async function foo(products, buyer = 'ЧАЙНАЯ ЛАВКА', day) {
     await fillingcell(worksheet, product)
 
     const fileName = `Отчет_${d}.xlsx`;
-    await workbook.xlsx.writeFile(fileName);
-    return fileName;
+    await workbook.xlsx.write(fileName);
 
 }
 
@@ -311,4 +329,4 @@ async function fillingcell(worksheet, products) {
 
 
 
-module.exports = {foo, generationRepProduct, generateProduct}
+module.exports = {foo, generationRepProduct, generateProduct, generateReportRevenueForPeriod}
