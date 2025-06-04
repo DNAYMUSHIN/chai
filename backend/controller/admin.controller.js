@@ -210,8 +210,6 @@ async addProduct(req, res) {
         if (!checkproduct.rows[0]) {
             let product_status = 1;
             if (product_count_min > quantity) {
-                product_status = 2
-            } else if (quantity === 0) {
                 product_status = 0
             }
             // Запрос для добавление товара в БД product
@@ -362,7 +360,7 @@ async createOrder(req, res) {
                 [information.rows[0].quantity - element.quantity, element.product_id]
             );
 
-            if (updateproduct.rows[0].quantity < 20) {
+            if (updateproduct.rows[0].quantity < element.rows[0].product_count_min) {
                 await db.query(
                     `UPDATE Product SET product_status = $1 WHERE product_id = $2`,
                     [0, element.product_id]
@@ -492,198 +490,277 @@ async getAllOrders(req, res) {
         }
     }*/
 
-    async getOrdersbyStatus(req, res) {
-        const {status} = req.query;
-        try {
-            const ordersResult = await db.query(`
-        SELECT o.*, 
-               json_agg(json_build_object(
-                   'product_id', p.product_id,  
-                   'product_name', p.product_name,
-                   'quantity', oi.quantity,
-                   'price', oi.price
-               )) as products
-        FROM Orders o
-        LEFT JOIN OrderItems oi ON o.order_id = oi.order_id
-        LEFT JOIN Product p ON oi.product_id = p.product_id
-        WHERE o.status = $1
-        GROUP BY o.order_id
-        ORDER BY o.createdat DESC
-        `, [status]);
-            res.status(200).json(ordersResult.rows);
-        } catch (err) {
-            console.error(`Error: ${err}`);
-            res.status(500).send("Internal Server Error");
-        }
+async getOrdersbyStatus(req, res) {
+    const {status} = req.query;
+    try {
+        const ordersResult = await db.query(`
+    SELECT o.*, 
+            json_agg(json_build_object(
+                'product_id', p.product_id,  
+                'product_name', p.product_name,
+                'quantity', oi.quantity,
+                'price', oi.price
+            )) as products
+    FROM Orders o
+    LEFT JOIN OrderItems oi ON o.order_id = oi.order_id
+    LEFT JOIN Product p ON oi.product_id = p.product_id
+    WHERE o.status = $1
+    GROUP BY o.order_id
+    ORDER BY o.createdat DESC
+    `, [status]);
+        res.status(200).json(ordersResult.rows);
+    } catch (err) {
+        console.error(`Error: ${err}`);
+        res.status(500).send("Internal Server Error");
+    }
+}
+
+// Редактирование заказа (состава и статуса)
+async updateOrder(req, res) {
+    const {order_id, status, products} = req.body;
+
+    if (!order_id) {
+        return res.status(400).json({error: 'ID заказа обязательно'});
     }
 
-    // Редактирование заказа (состава и статуса)
-    async updateOrder(req, res) {
-        const {order_id, status, products} = req.body;
+    try {
+        // Начинаем транзакцию
+        await db.query('BEGIN');
 
-        if (!order_id) {
-            return res.status(400).json({error: 'ID заказа обязательно'});
+        // 1. Обновляем статус заказа, если он передан
+        if (status !== undefined) {
+            await db.query(
+                `UPDATE orders SET status = $1 WHERE order_id = $2`,
+                [status, order_id]
+            );
         }
 
-        try {
-            // Начинаем транзакцию
-            await db.query('BEGIN');
+        // 2. Если передан новый состав заказа
+        if (products && Array.isArray(products)) {
+            // Удаляем старые позиции заказа
+            await db.query(
+                `DELETE FROM orderitems WHERE order_id = $1`,
+                [order_id]
+            );
 
-            // 1. Обновляем статус заказа, если он передан
-            if (status !== undefined) {
+            // Восстанавливаем остатки по старым позициям
+            const oldItems = await db.query(
+                `SELECT product_id, quantity FROM orderitems WHERE order_id = $1`,
+                [order_id]
+            );
+
+            for (const item of oldItems.rows) {
                 await db.query(
-                    `UPDATE orders SET status = $1 WHERE order_id = $2`,
-                    [status, order_id]
+                    `UPDATE product SET quantity = quantity + $1 
+                WHERE product_id = $2`,
+                    [item.quantity, item.product_id]
                 );
             }
 
-            // 2. Если передан новый состав заказа
-            if (products && Array.isArray(products)) {
-                // Удаляем старые позиции заказа
+            // Добавляем новые позиции и обновляем остатки
+            let total = 0;
+            for (const product of products) {
+                // Добавляем позицию в заказ
                 await db.query(
-                    `DELETE FROM orderitems WHERE order_id = $1`,
-                    [order_id]
+                    `INSERT INTO orderitems 
+                (order_id, product_id, quantity, price) 
+                VALUES ($1, $2, $3, $4)`,
+                    [order_id, product.product_id, product.quantity, product.price]
                 );
 
-                // Восстанавливаем остатки по старым позициям
-                const oldItems = await db.query(
-                    `SELECT product_id, quantity FROM orderitems WHERE order_id = $1`,
-                    [order_id]
-                );
-
-                for (const item of oldItems.rows) {
-                    await db.query(
-                        `UPDATE product SET quantity = quantity + $1 
-                 WHERE product_id = $2`,
-                        [item.quantity, item.product_id]
-                    );
-                }
-
-                // Добавляем новые позиции и обновляем остатки
-                let total = 0;
-                for (const product of products) {
-                    // Добавляем позицию в заказ
-                    await db.query(
-                        `INSERT INTO orderitems 
-                 (order_id, product_id, quantity, price) 
-                 VALUES ($1, $2, $3, $4)`,
-                        [order_id, product.product_id, product.quantity, product.price]
-                    );
-
-                    // Обновляем остатки товара
-                    await db.query(
-                        `UPDATE product SET quantity = quantity - $1 
-                 WHERE product_id = $2`,
-                        [product.quantity, product.product_id]
-                    );
-
-                    total += product.price * product.quantity;
-                }
-
-                // Обновляем общую сумму заказа
+                // Обновляем остатки товара
                 await db.query(
-                    `UPDATE orders SET total = $1 WHERE order_id = $2`,
-                    [total, order_id]
+                    `UPDATE product SET quantity = quantity - $1 
+                WHERE product_id = $2`,
+                    [product.quantity, product.product_id]
                 );
+
+                total += product.price * product.quantity;
             }
 
-            // Получаем обновленный заказ с товарами
-            const updatedOrder = await db.query(`
-        SELECT o.*, 
-               json_agg(json_build_object(
-                   'product_name', p.product_name,
-                   'quantity', oi.quantity,
-                   'price', oi.price,
-                   'product_id', p.product_id
-               )) as products
-        FROM Orders o
-        LEFT JOIN OrderItems oi ON o.order_id = oi.order_id
-        LEFT JOIN Product p ON oi.product_id = p.product_id
-        WHERE o.order_id = $1
-        GROUP BY o.order_id
-    `, [order_id]);
+            // Обновляем общую сумму заказа
+            await db.query(
+                `UPDATE orders SET total = $1 WHERE order_id = $2`,
+                [total, order_id]
+            );
+        }
 
-            // Завершаем транзакцию
-            await db.query('COMMIT');
+        // Получаем обновленный заказ с товарами
+        const updatedOrder = await db.query(`
+    SELECT o.*, 
+            json_agg(json_build_object(
+                'product_name', p.product_name,
+                'quantity', oi.quantity,
+                'price', oi.price,
+                'product_id', p.product_id
+            )) as products
+    FROM Orders o
+    LEFT JOIN OrderItems oi ON o.order_id = oi.order_id
+    LEFT JOIN Product p ON oi.product_id = p.product_id
+    WHERE o.order_id = $1
+    GROUP BY o.order_id
+`, [order_id]);
 
-            res.status(200).json({
-                message: 'Заказ успешно обновлен',
-                order: updatedOrder.rows[0]
+        // Завершаем транзакцию
+        await db.query('COMMIT');
+
+        res.status(200).json({
+            message: 'Заказ успешно обновлен',
+            order: updatedOrder.rows[0]
+        });
+    } catch (err) {
+        // Откатываем транзакцию в случае ошибки
+        await db.query('ROLLBACK');
+        console.error('Ошибка при обновлении заказа:', err);
+        res.status(500).json({error: 'Ошибка сервера при обновлении заказа'});
+    }
+}
+
+// Поиск товара по штрих-коду
+async getProductByBarcode(req, res) {
+    const {code} = req.params;
+    try {
+        const result = await db.query(
+            `SELECT * FROM Product WHERE product_id = $1`,
+            [code]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({message: "Товар не найден"});
+        }
+
+        res.status(200).json(result.rows[0]);
+    } catch (err) {
+        console.error("Ошибка поиска по штрих-коду:", err);
+        res.status(500).json({error: "Ошибка сервера"});
+    }
+}
+
+
+// Генерация отчета за день.
+async generateDailyReport(req, res) {
+    const day = req.body
+    const daily = day["day"].split('.').reverse().join('-')
+    const Orders = await db.query(`SELECT * FROM orders WHERE createdat::date = $1`, [daily])
+
+
+    res.setHeader(
+            'Content-Type',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    );
+    res.setHeader(
+            'Content-Disposition',
+            'attachment; filename="reportDaily.xlsx"'
+    );
+
+
+    await reportHelpers.foo([Orders.rows[0]], "Чайная Лавка", daily)
+}
+
+async generateProductReport(req, res) {
+    const {status} = req.body;
+    try {
+        const Products = await db.query(`SELECT * FROM Product WHERE status = $1`, status);
+
+        // Настраиваем заголовки ответа перед генерацией файла
+        res.setHeader(
+            'Content-Type',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        );
+        res.setHeader(
+            'Content-Disposition',
+            'attachment; filename="report.xlsx"'
+        );
+
+        // Генерируем и отправляем файл
+        await reportHelpers.generateProduct(Products.rows, res);
+
+        
+    } catch (err) {
+        console.log("Ошибка - ", err);
+        res.status(500).json({message: "Ошибка на сервере"});
+    }
+}
+
+async generateReport(req, res){
+    const {startDate, endDate} = req.body
+    const start = startDate.split('.').reverse().join('-')
+    const end = endDate.split('.').reverse().join('-')
+    let itemsorders = []
+    try{
+        // Получаем все необходимые данные одним запросом с JOIN
+        const reportData = await db.query(`
+            SELECT 
+                Orders.order_id AS "order_id",
+                Orders.createdat AS "order_date",
+                Orders.total AS "order_total",
+                Product.product_name AS "product_name",
+                CASE 
+                    WHEN Product.product_type = 1 THEN 'штук'
+                    WHEN Product.product_type = 2 THEN 'грамм'
+                END AS "product_type",
+                OrderItems.quantity AS "quantity",
+                OrderItems.price AS "item_price"
+            FROM Orders
+            JOIN OrderItems ON Orders.order_id = OrderItems.order_id
+            JOIN Product ON OrderItems.product_id = Product.product_id
+            WHERE Orders.createdat::date BETWEEN $1 AND $2
+            ORDER BY Orders.order_id, Orders.createdat
+        `, [start, end]);
+
+        if (reportData.rows.length === 0) {
+            return res.status(404).json({message: "Нет данных за указанный период"});
+        }
+
+        // Формируем структуры данных для отчета
+        const summary = []; // Сводка по заказам
+        const details = []; // Детализация по товарам
+        const ordersMap = new Map(); // Для группировки по заказам
+
+        reportData.rows.forEach(row => {
+            const orderId = row.order_id;
+            
+            // Добавляем в сводный отчет (если заказ еще не добавлен)
+            if (!ordersMap.has(orderId)) {
+                ordersMap.set(orderId, true);
+                summary.push({
+                    "Номер заказа": orderId,
+                    "Дата заказа": new Date(row.order_date).toLocaleDateString('ru-RU'),
+                    "Сумма заказа": row.order_total
+                });
+            }
+            
+            // Добавляем в детализацию
+            details.push({
+                "Номер заказа": orderId,
+                "Название товара": row.product_name,
+                "Тип товара": row.product_type,
+                "Количество": row.quantity,
+                "Цена за единицу": row.item_price,
+                "Сумма": row.quantity * row.item_price
             });
-        } catch (err) {
-            // Откатываем транзакцию в случае ошибки
-            await db.query('ROLLBACK');
-            console.error('Ошибка при обновлении заказа:', err);
-            res.status(500).json({error: 'Ошибка сервера при обновлении заказа'});
-        }
+        });
+
+        // Настройка заголовков для скачивания
+        res.setHeader(
+            'Content-Type',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        );
+        res.setHeader(
+            'Content-Disposition',
+            `attachment; filename="revenue_report_${startDate}_${endDate}.xlsx"`
+        );
+
+        // Генерация отчета
+        await reportHelpers.generateReportRevenueForPeriod(summary, details, start, end, res);
+    }
+    catch(err){
+        console.error("Ошибка при генерации отчёта:", err);
+        res.status(500).json({message: "Ошибка на сервере"});
     }
 
-    // Поиск товара по штрих-коду
-    async getProductByBarcode(req, res) {
-        const {code} = req.params;
-        try {
-            const result = await db.query(
-                `SELECT * FROM Product WHERE product_id = $1`,
-                [code]
-            );
+}
 
-            if (result.rows.length === 0) {
-                return res.status(404).json({message: "Товар не найден"});
-            }
-
-            res.status(200).json(result.rows[0]);
-        } catch (err) {
-            console.error("Ошибка поиска по штрих-коду:", err);
-            res.status(500).json({error: "Ошибка сервера"});
-        }
-    }
-
-
-    // Генерация отчета за день.
-    async generateDailyReport(req, res) {
-        const day = req.body
-        const daily = day["day"].split('.').reverse().join('-')
-        console.log(daily)
-        const Orders = await db.query(`SELECT * FROM orders WHERE createdat::date = $1`, [daily])
-        console.log(Orders.rows[0], "A")
-
-        await reportHelpers.foo([Orders.rows[0]], "Чайная Лавка", daily)
-        res.status(200).send("OOOO")
-    }
-
-    async generateProductReport(req, res) {
-        const {status} = req.body;
-        try {
-            let query = 'SELECT * FROM Product';
-            let params = [];
-
-            // В зависимости от статуса изменяем запрос
-            if (status !== 'all') {
-                query += ' WHERE status = $1';
-                params.push(status);
-            }
-
-            const Products = await db.query(query, params);
-
-            // Настраиваем заголовки ответа перед генерацией файла
-            res.setHeader(
-                'Content-Type',
-                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-            );
-            res.setHeader(
-                'Content-Disposition',
-                'attachment; filename="report.xlsx"'
-            );
-
-            // Генерируем и отправляем файл
-            await reportHelpers.generateProduct(Products.rows, res);
-
-            // Не нужно отправлять res.status(201).send(file), так как generateProduct уже отправляет ответ
-        } catch (err) {
-            console.log("Ошибка - ", err);
-            res.status(500).json({message: "Ошибка на сервере"});
-        }
-    }
 }
 
 module.exports = new adminController();
