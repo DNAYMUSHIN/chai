@@ -21,7 +21,6 @@ const AddManually = ({open, onClose, onAddProduct}) => {
 
     const inputRef = useRef(null);
 
-    console.log(open);
 
     useEffect(() => {
         if (open) {
@@ -82,7 +81,6 @@ const AddManually = ({open, onClose, onAddProduct}) => {
     };
 
     const handleAddToOrder = (product) => {
-        console.log("Добавляем товар в CreateOrder:", product); // <--- Ловим момент передачи
         if (!product.product_id) {
             console.error("Невозможно добавить товар без ID", product);
             alert("Выбранный товар не имеет корректного ID");
@@ -90,11 +88,11 @@ const AddManually = ({open, onClose, onAddProduct}) => {
         }
 
         onAddProduct({
-            id: product.product_id,
+            product_id: product.product_id,
             name: product.product_name || 'Неизвестный товар',
             price: product.price_unit || 0,
             quantity: 1,
-            total: product.price_unit || 0,
+            total: 0,
             quantityInStock: product.quantity,
             product_type: product.product_type,
             price_for_grams: product.price_for_grams,
@@ -146,7 +144,6 @@ const AddManually = ({open, onClose, onAddProduct}) => {
                                     </Button>
                                 </li>
                             ))}
-                            {searchResults.map(product => console.log(product))}
                         </ul>
                     ) : searchQuery ? (
                         <div>Товары не найдены</div>

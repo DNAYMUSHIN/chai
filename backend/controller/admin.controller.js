@@ -7,6 +7,8 @@ const {ProductType} = require('../constants')
 const {time, error} = require('console');
 const {ADDRGETNETWORKPARAMS} = require('dns');
 
+
+
 class adminController {
     /*
     Управление товарами
@@ -171,7 +173,7 @@ class adminController {
         }
     }
 
-    async addProduct(req, res) {
+    /*async addProduct(req, res) {
         const {
             product_category,
             product_name,
@@ -183,7 +185,12 @@ class adminController {
             product_price_min,
             product_code
         } = req.body;
-        let type = product_type === ProductType.PIECE ? 1 : 2
+
+        console.log(product_type);
+
+        console.log(req.body);
+
+        let type = product_type;/!* === ProductType.PIECE ? 1 : 2*!/
 
         if (!product_name || !product_category || product_price_unit == undefined || quantity == undefined) {
             return res.status(400).json({error: 'Некорректные данные'});
@@ -210,14 +217,12 @@ class adminController {
             if (!checkproduct.rows[0]) {
                 let product_status = 1;
                 if (product_count_min > quantity) {
-                    product_status = 2
-                } else if (quantity === 0) {
                     product_status = 0
                 }
                 // Запрос для добавление товара в БД product
                 const newProduct = await db.query(
                     `INSERT INTO Product (product_category_id, product_name, product_type, price_unit, quantity, product_count_min, product_price_min, product_code, product_status, price_for_grams)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
                     [category_id, product_name, type, product_price_unit, quantity, product_count_min, product_price_min, product_code, product_status, price_for_grams]);
                 res.status(201).json({message: 'Товар добавлен', product: newProduct.rows[0]});
             } else {
@@ -230,34 +235,871 @@ class adminController {
             res.status(500).json({error: 'Ошибка сервера'});
         }
     }
+*/
 
-    async updateProduct(req, res) {
-        const {product_id, field, value} = req.body;
+    async addProduct(req, res) {
+        const {
+            product_name,
+            product_category_id,
+            product_type,
+            product_price_unit,
+            quantity,
+            price_for_grams,
+            product_count_min,
+            product_price_min,
+            product_code
+        } = req.body;
+
+        // Вспомогательная функция для проверки UUID
+        function isValidUUID(uuid) {
+            const regex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-5][0-9a-f]{3}-[089ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+            return regex.test(uuid);
+        }
 
         try {
-            // Если обновляется категория - сначала находим её ID
-            if (field === 'product_category') {
-                const categoryQuery = 'SELECT category_id FROM category WHERE category_name = $1';
-                const categoryResult = await db.query(categoryQuery, [value]);
-
-                if (categoryResult.rows.length === 0) {
-                    return res.status(400).json({error: 'Категория не найдена'});
-                }
-
-                const updateQuery = `UPDATE Product SET product_category_id = $1 WHERE product_id = $2 RETURNING *`;
-                const updatedProduct = await db.query(updateQuery, [categoryResult.rows[0].category_id, product_id]);
-                return res.status(200).json({message: 'Товар обновлен', product: updatedProduct.rows[0]});
+            // Валидация обязательных данных
+            if (!product_name || !product_category_id || !isValidUUID(product_category_id)) {
+                return res.status(400).json({ error: 'Не все обязательные поля заполнены или ID категории неверен' });
             }
 
-            // Для остальных полей
-            const updateQuery = `UPDATE Product SET ${field} = $1 WHERE product_id = $2 RETURNING *`;
-            const updatedProduct = await db.query(updateQuery, [value, product_id]);
-            res.status(200).json({message: 'Товар обновлен', product: updatedProduct.rows[0]});
+            const numericFields = {
+                product_price_unit: parseFloat(product_price_unit),
+                quantity: parseInt(quantity),
+                product_count_min: parseInt(product_count_min),
+                product_price_min: parseFloat(product_price_min),
+                product_code: product_code ? parseInt(product_code) : null
+            };
+
+            let final_price_for_grams = null;
+
+            if (product_type === 1) {
+                // Штучный товар → price_for_grams должен быть NULL
+                final_price_for_grams = null;
+            } else if (product_type === 2) {
+                // Весовой товар → проверяем, чтобы price_for_grams было положительным числом
+                const grams = parseInt(price_for_grams);
+                if (isNaN(grams) || grams <= 0) {
+                    return res.status(400).json({ error: 'Цена за граммы должна быть положительным целым числом' });
+                }
+                final_price_for_grams = grams;
+            } else {
+                return res.status(400).json({ error: 'Тип продукта должен быть 1 (штучный) или 2 (весовой)' });
+            }
+
+            // Добавляем товар в БД
+            const queryText = `
+            INSERT INTO Product (
+                product_category_id, product_name, product_type, 
+                price_unit, quantity, price_for_grams,
+                product_count_min, product_price_min, product_code, product_status
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            RETURNING *
+        `;
+
+            const values = [
+                product_category_id,
+                product_name,
+                product_type,
+                numericFields.product_price_unit,
+                numericFields.quantity,
+                final_price_for_grams,
+                numericFields.product_count_min,
+                numericFields.product_price_min,
+                numericFields.product_code,
+                1 // product_status по умолчанию активный
+            ];
+
+            const result = await db.query(queryText, values);
+
+            return res.status(201).json({
+                message: 'Товар успешно добавлен',
+                product: result.rows[0]
+            });
+
         } catch (err) {
-            console.error('Ошибка обновления товара:', err);
-            res.status(500).json({error: 'Ошибка сервера'});
+            console.error('Ошибка при добавлении товара:', err);
+            return res.status(500).json({
+                error: 'Ошибка сервера при добавлении товара',
+                details: err.message
+            });
         }
     }
+    async updateProduct(req, res) {
+        const { product_id, ...updates } = req.body;
+
+        function isValidUUID(uuid) {
+            const regex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-5][0-9a-f]{3}-[089ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+            return regex.test(uuid);
+        }
+
+        console.log("aaaaaaaaaaaaaaaaaaa1")
+
+        try {
+            if (!product_id || !isValidUUID(product_id)) {
+                return res.status(400).json({ error: 'Неверный ID товара' });
+            }
+
+            const currentProduct = await db.query(
+                'SELECT * FROM Product WHERE product_id = $1',
+                [product_id]
+            );
+
+            if (currentProduct.rows.length === 0) {
+                return res.status(404).json({ error: 'Товар не найден' });
+            }
+
+            let fieldsToUpdate = [];
+            let values = [];
+            let paramIndex = 1;
+
+            for (const field in updates) {
+                const value = updates[field];
+
+                console.log("aaaaaaaaaaaaaaaaaaa")
+                switch (field) {
+                    case 'product_name':
+                        if (typeof value !== 'string' || !value.trim()) {
+                            return res.status(400).json({ error: 'Название товара не может быть пустым' });
+                        }
+                        fieldsToUpdate.push(`product_name = $${paramIndex++}`);
+                        values.push(value.trim());
+                        break;
+
+                    case 'product_category_id':
+                        if (!isValidUUID(value)) {
+                            return res.status(400).json({ error: 'Неверный ID категории' });
+                        }
+                        const categoryExists = await db.query(
+                            'SELECT 1 FROM Category WHERE category_id = $1',
+                            [value]
+                        );
+                        if (categoryExists.rows.length === 0) {
+                            return res.status(400).json({ error: 'Категория не существует' });
+                        }
+                        fieldsToUpdate.push(`product_category_id = $${paramIndex++}`);
+                        values.push(value);
+                        break;
+
+                    case 'product_type':
+                        console.log("aaaaaaaaaaaaaaaaaaaAA1")
+                        const numericType = Number(value);
+                        if (![1, 2].includes(numericType)) {
+                            return res.status(400).json({ error: 'Тип продукта должен быть 1 или 2' });
+                        }
+
+                        console.log("aaaaaaaaaaaaaaaaaaaAA2")
+                        // Добавляем только один раз
+                        fieldsToUpdate.push(`product_type = $${paramIndex++}`);
+                        values.push(numericType);
+/*
+                        console.log("aaaaaaaaaaaaaaaaaaaAA3")
+                        if (numericType === 1) {
+                            // Устанавливаем price_for_grams = NULL при смене на штучный тип
+                            fieldsToUpdate.push(`price_for_grams = $${paramIndex++}`);
+                            values.push(null);
+                        }
+
+                        console.log("aaaaaaaaaaaaaaaaaaaAA4")*/
+                        break;
+
+                    case 'price_unit':
+                        const priceUnit = parseFloat(value);
+                        if (isNaN(priceUnit) || priceUnit < 0) {
+                            return res.status(400).json({ error: 'Цена должна быть положительным числом' });
+                        }
+                        fieldsToUpdate.push(`price_unit = $${paramIndex++}`);
+                        values.push(priceUnit);
+                        break;
+
+                    case 'quantity':
+                        const quantity = parseInt(value);
+                        if (isNaN(quantity) || quantity < 0) {
+                            return res.status(400).json({ error: 'Количество должно быть неотрицательным целым числом' });
+                        }
+                        fieldsToUpdate.push(`quantity = $${paramIndex++}`);
+                        values.push(quantity);
+                        break;
+
+                    case 'price_for_grams':
+                        // Разрешаем null для штучного товара
+                        if (value === null) {
+                            fieldsToUpdate.push(`price_for_grams = $${paramIndex++}`);
+                            values.push(null);
+                            break;
+                        }
+
+                        const priceForGrams = parseInt(value);
+                        if (isNaN(priceForGrams) || priceForGrams <= 0) {
+                            return res.status(400).json({
+                                error: 'Цена за граммы должна быть положительным целым числом или null'
+                            });
+                        }
+
+                        // Проверяем, что товар весовой
+                        const currentType = currentProduct.rows[0].product_type;
+                        if (currentType !== 2 && updates.product_type !== 2) {
+                            return res.status(400).json({
+                                error: 'Можно задать цену за граммы только для весового товара'
+                            });
+                        }
+
+                        fieldsToUpdate.push(`price_for_grams = $${paramIndex++}`);
+                        values.push(priceForGrams);
+                        break;
+
+                    case 'product_count_min':
+                        const countMin = parseFloat(value);
+                        if (isNaN(countMin) || countMin < 0) {
+                            return res.status(400).json({ error: 'Минимальное количество должно быть неотрицательным числом' });
+                        }
+                        fieldsToUpdate.push(`product_count_min = $${paramIndex++}`);
+                        values.push(countMin);
+                        break;
+
+                    case 'product_price_min':
+                        const priceMin = parseFloat(value);
+                        if (isNaN(priceMin) || priceMin < 0) {
+                            return res.status(400).json({ error: 'Минимальная цена должна быть неотрицательным числом' });
+                        }
+                        fieldsToUpdate.push(`product_price_min = $${paramIndex++}`);
+                        values.push(priceMin);
+                        break;
+
+                    case 'product_code':
+                        const code = parseInt(value);
+                        if (isNaN(code) || code <= 0) {
+                            return res.status(400).json({ error: 'Код товара должен быть положительным целым числом' });
+                        }
+                        fieldsToUpdate.push(`product_code = $${paramIndex++}`);
+                        values.push(code);
+                        break;
+
+                    default:
+                        return res.status(400).json({ error: `Поле "${field}" не поддерживается для обновления` });
+                }
+            }
+            console.log("aaaaaaaaaaaaaaaaaaa6")
+
+            // Также проверяем, если type поменялся на 1 и price_for_grams ещё не был обновлён
+            const wasTypeChangedToShT = updates.product_type && Number(updates.product_type) === 1;
+            const priceForGramsAlreadyUpdated = fieldsToUpdate.some(f => f.includes('price_for_grams'));
+
+            console.log("aaaaaaaaaaaaaaaaaaa7")
+            if (wasTypeChangedToShT && !priceForGramsAlreadyUpdated) {
+                fieldsToUpdate.push(`price_for_grams = $${paramIndex++}`);
+                values.push(null);
+            }
+
+            console.log("aaaaaaaaaaaaaaaaaaa8")
+            if (fieldsToUpdate.length === 0) {
+                return res.status(400).json({ error: 'Нет данных для обновления' });
+            }
+
+            console.log("aaaaaaaaaaaaaaaaaaa9")
+            const queryText = `
+            UPDATE Product 
+            SET ${fieldsToUpdate.join(', ')} 
+            WHERE product_id = $${paramIndex} 
+            RETURNING *
+        `;
+            values.push(product_id);
+
+            console.log("aaaaaaaaaaaaaaaaaaa2")
+            const updatedProduct = await db.query(queryText, values);
+
+            console.log("aaaaaaaaaaaaaaaaaaa3")
+            return res.status(200).json({
+                message: 'Товар успешно обновлён',
+                product: updatedProduct.rows[0],
+            });
+
+        } catch (err) {
+            console.error('Ошибка обновления товара:', err);
+            return res.status(500).json({
+                error: 'Ошибка сервера при обновлении товара',
+                details: err.message
+            });
+        }
+    }
+
+
+    /*async updateProduct(req, res) {
+        const { product_id, ...updates } = req.body;
+
+        // Проверка UUID
+        function isValidUUID(uuid) {
+            const regex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-5][0-9a-f]{3}-[089ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+            return regex.test(uuid);
+        }
+
+        try {
+            if (!product_id || !isValidUUID(product_id)) {
+                return res.status(400).json({ error: 'Неверный ID товара' });
+            }
+
+            const currentProduct = await db.query(
+                'SELECT * FROM Product WHERE product_id = $1',
+                [product_id]
+            );
+
+            if (currentProduct.rows.length === 0) {
+                return res.status(404).json({ error: 'Товар не найден' });
+            }
+
+            let fieldsToUpdate = [];
+            let values = [];
+            let paramIndex = 1;
+
+            // Текущее значение product_type
+            let newType = currentProduct.rows[0].product_type;
+
+            console.log(updates);
+
+            for (const field in updates) {
+                const value = updates[field];
+
+                switch (field) {
+                    case 'product_name':
+                        if (typeof value !== 'string' || !value.trim()) {
+                            return res.status(400).json({ error: 'Название товара не может быть пустым' });
+                        }
+                        fieldsToUpdate.push(`product_name = $${paramIndex++}`);
+                        values.push(value.trim());
+                        break;
+
+                    case 'product_category_id':
+                        if (!isValidUUID(value)) {
+                            return res.status(400).json({ error: 'Неверный ID категории' });
+                        }
+                        const categoryExists = await db.query(
+                            'SELECT 1 FROM Category WHERE category_id = $1',
+                            [value]
+                        );
+                        if (categoryExists.rows.length === 0) {
+                            return res.status(400).json({ error: 'Категория не существует' });
+                        }
+                        fieldsToUpdate.push(`product_category_id = $${paramIndex++}`);
+                        values.push(value);
+                        break;
+
+                    case 'product_type':
+                        const numericType = Number(value);
+                        if (![1, 2].includes(numericType)) {
+                            return res.status(400).json({ error: 'Тип продукта должен быть 1 (штучный) или 2 (весовой)' });
+                        }
+                        newType = numericType;
+                        fieldsToUpdate.push(`product_type = $${paramIndex++}`);
+                        values.push(numericType);
+
+                        if (numericType === 1) {
+                            // Штучный → price_for_grams = NULL
+                            fieldsToUpdate.push(`price_for_grams = $${paramIndex++}`);
+                            values.push(null);
+                        }
+                        break;
+
+                    case 'price_unit':
+                        const priceUnit = parseFloat(value);
+                        if (isNaN(priceUnit) || priceUnit < 0) {
+                            return res.status(400).json({ error: 'Цена должна быть положительным числом' });
+                        }
+                        fieldsToUpdate.push(`price_unit = $${paramIndex++}`);
+                        values.push(priceUnit);
+                        break;
+
+                    case 'quantity':
+                        const quantity = parseInt(value);
+                        if (isNaN(quantity) || quantity < 0) {
+                            return res.status(400).json({ error: 'Количество должно быть неотрицательным целым числом' });
+                        }
+                        fieldsToUpdate.push(`quantity = $${paramIndex++}`);
+                        values.push(quantity);
+                        break;
+
+
+                    case 'price_for_grams':
+                        if (value === null) {
+                            // Разрешаем явное обновление на NULL, например при смене типа на штучный
+                            fieldsToUpdate.push(`price_for_grams = $${paramIndex++}`);
+                            values.push(null);
+                            break;
+                        }
+
+                        const priceForGrams = parseInt(value);
+                        if (isNaN(priceForGrams) || priceForGrams <= 0) {
+                            return res.status(400).json({ error: 'Цена за граммы должна быть положительным целым числом или null' });
+                        }
+
+                        // Только если товар весовой
+                        if (newType === 2) {
+                            fieldsToUpdate.push(`price_for_grams = $${paramIndex++}`);
+                            values.push(priceForGrams);
+                        } else {
+                            return res.status(400).json({ error: 'Можно задать цену за граммы только для весового товара' });
+                        }
+                        break;
+
+
+                    /!*case 'price_for_grams':
+                        const priceForGrams = parseInt(value);
+                        if (isNaN(priceForGrams) || priceForGrams <= 0) {
+                            return res.status(400).json({ error: 'Цена за граммы должна быть положительным целым числом' });
+                        }
+
+                        // Только если товар весовой
+                        if (newType === 2) {
+                            fieldsToUpdate.push(`price_for_grams = $${paramIndex++}`);
+                            values.push(priceForGrams);
+                        } else {
+                            return res.status(400).json({ error: 'Можно задать цену за граммы только для весового товара' });
+                        }
+                        break;*!/
+
+                    case 'product_count_min':
+                        const countMin = parseFloat(value);
+                        if (isNaN(countMin) || countMin < 0) {
+                            return res.status(400).json({ error: 'Минимальное количество должно быть неотрицательным числом' });
+                        }
+                        fieldsToUpdate.push(`product_count_min = $${paramIndex++}`);
+                        values.push(countMin);
+                        break;
+
+                    case 'product_price_min':
+                        const priceMin = parseFloat(value);
+                        if (isNaN(priceMin) || priceMin < 0) {
+                            return res.status(400).json({ error: 'Минимальная цена должна быть неотрицательным числом' });
+                        }
+                        fieldsToUpdate.push(`product_price_min = $${paramIndex++}`);
+                        values.push(priceMin);
+                        break;
+
+                    case 'product_code':
+                        const code = parseInt(value);
+                        if (isNaN(code) || code <= 0) {
+                            return res.status(400).json({ error: 'Код товара должен быть положительным целым числом' });
+                        }
+                        fieldsToUpdate.push(`product_code = $${paramIndex++}`);
+                        values.push(code);
+                        break;
+
+                    default:
+                        return res.status(400).json({ error: `Поле "${field}" не поддерживается для обновления` });
+                }
+            }
+
+            console.log("AAAAAAAAAAAAAAAAAAAAAA")
+            if (fieldsToUpdate.length === 0) {
+                return res.status(400).json({ error: 'Нет данных для обновления' });
+            }
+
+            console.log("AAAAAAAAAAAAAAAAAAAAAA")
+            // Если изменили тип на штучный и не добавили price_for_grams — устанавливаем NULL
+            const wasTypeChangedToShT = updates.product_type && Number(updates.product_type) === 1;
+            if (wasTypeChangedToShT && !('price_for_grams' in updates)) {
+                fieldsToUpdate.push(`price_for_grams = $${paramIndex++}`);
+                values.push(null);
+            }
+
+            console.log("AAAAAAAAAAAAAAAAAAAAAA1")
+            const queryText = `
+            UPDATE Product 
+            SET ${fieldsToUpdate.join(', ')} 
+            WHERE product_id = $${paramIndex} 
+            RETURNING *
+        `;
+            values.push(product_id);
+
+            console.log("AAAAAAAAAAAAAAAAAAAAAA2")
+            const updatedProduct = await db.query(queryText, values);
+
+            console.log("AAAAAAAAAAAAAAAAAAAAAA3")
+            return res.status(200).json({
+                message: 'Товар успешно обновлён',
+                product: updatedProduct.rows[0],
+            });
+
+        } catch (err) {
+            console.error('Ошибка обновления товара:', err);
+            return res.status(500).json({
+                error: 'Ошибка сервера при обновлении товара',
+                details: err.message
+            });
+        }
+    }
+*/
+    /*async updateProduct(req, res) {
+        const { product_id, ...updates } = req.body;
+        console.log("AAAAAAAAAAAAAAAAAAAAAAA");
+
+        // Проверка UUID
+        function isValidUUID(uuid) {
+            const regex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-5][0-9a-f]{3}-[089ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+            return regex.test(uuid);
+        }
+
+        try {
+            if (!product_id || !isValidUUID(product_id)) {
+                return res.status(400).json({ error: 'Неверный ID товара' });
+            }
+
+            console.log("AAAAAAAAAAAAAAAAAAAAAAA");
+            const currentProduct = await db.query(
+                'SELECT * FROM Product WHERE product_id = $1',
+                [product_id]
+            );
+
+            console.log("AAAAAAAAAAAAAAAAAAAAAAA");
+            if (currentProduct.rows.length === 0) {
+                return res.status(404).json({ error: 'Товар не найден' });
+            }
+
+            console.log("AAAAAAAAAAAAAAAAAAAAAAA");
+            let fieldsToUpdate = [];
+            let values = [];
+            let paramIndex = 1;
+
+            // Текущее значение product_type
+            let newType = currentProduct.rows[0].product_type;
+
+
+            console.log('Поля для обновления:', Object.keys(updates));
+
+            console.log("AAAAAAAAAAAAAAAAAAAAAAA");
+            for (const field in updates) {
+                const value = updates[field];
+
+
+                console.log("AAAAAAAAAAAAAAAAAAAAAAA" + value);
+
+                switch (field) {
+                    case 'product_name':
+                        console.log("BBBBBBBBBBBBBBBBBBBB");
+                        if (typeof value !== 'string' || !value.trim()) {
+                            return res.status(400).json({ error: 'Название товара не может быть пустым' });
+                        }
+                        fieldsToUpdate.push(`product_name = $${paramIndex++}`);
+                        values.push(value.trim());
+                        console.log("BBBBBBBBBBBBBBBBBBBB");
+                        break;
+
+                    case 'product_category_id':
+                        if (!isValidUUID(value)) {
+                            return res.status(400).json({ error: 'Неверный ID категории' });
+                        }
+                        const categoryExists = await db.query(
+                            'SELECT 1 FROM Category WHERE category_id = $1',
+                            [value]
+                        );
+                        if (categoryExists.rows.length === 0) {
+                            return res.status(400).json({ error: 'Категория не существует' });
+                        }
+                        fieldsToUpdate.push(`product_category_id = $${paramIndex++}`);
+                        values.push(value);
+                        break;
+
+                    case 'product_type':
+                        const numericType = Number(value);
+                        if (![1, 2].includes(numericType)) {
+                            return res.status(400).json({ error: 'Тип продукта должен быть 1 (штучный) или 2 (весовой)' });
+                        }
+                        newType = numericType;
+                        fieldsToUpdate.push(`product_type = $${paramIndex++}`);
+                        values.push(numericType);
+
+                        if (numericType === 1) {
+                            // Штучный → price_for_grams = NULL
+                            fieldsToUpdate.push(`price_for_grams = $${paramIndex++}`);
+                            values.push(null);
+                        }
+                        break;
+
+                    case 'product_price_unit':
+                        const priceUnit = parseFloat(value);
+                        if (isNaN(priceUnit) || priceUnit < 0) {
+                            return res.status(400).json({ error: 'Цена должна быть положительным числом' });
+                        }
+                        fieldsToUpdate.push(`price_unit = $${paramIndex++}`);
+                        values.push(priceUnit);
+                        break;
+
+                    case 'quantity':
+                        const quantity = parseInt(value);
+                        if (isNaN(quantity) || quantity < 0) {
+                            return res.status(400).json({ error: 'Количество должно быть неотрицательным целым числом' });
+                        }
+                        fieldsToUpdate.push(`quantity = $${paramIndex++}`);
+                        values.push(quantity);
+                        break;
+
+                    case 'price_for_grams':
+                        const priceForGrams = parseInt(value);
+                        if (isNaN(priceForGrams) || priceForGrams <= 0) {
+                            return res.status(400).json({ error: 'Цена за граммы должна быть положительным целым числом' });
+                        }
+
+                        // Только если товар весовой
+                        if (newType === 2) {
+                            fieldsToUpdate.push(`price_for_grams = $${paramIndex++}`);
+                            values.push(priceForGrams);
+                        } else {
+                            return res.status(400).json({ error: 'Можно задать цену за граммы только для весового товара' });
+                        }
+                        break;
+
+                    case 'product_count_min':
+                        const countMin = parseFloat(value);
+                        if (isNaN(countMin) || countMin < 0) {
+                            return res.status(400).json({ error: 'Минимальное количество должно быть неотрицательным числом' });
+                        }
+                        fieldsToUpdate.push(`product_count_min = $${paramIndex++}`);
+                        values.push(countMin);
+                        break;
+
+                    case 'product_price_min':
+                        const priceMin = parseFloat(value);
+                        if (isNaN(priceMin) || priceMin < 0) {
+                            return res.status(400).json({ error: 'Минимальная цена должна быть неотрицательным числом' });
+                        }
+                        fieldsToUpdate.push(`product_price_min = $${paramIndex++}`);
+                        values.push(priceMin);
+                        break;
+
+                    case 'product_code':
+                        const code = parseInt(value);
+                        if (isNaN(code) || code <= 0) {
+                            return res.status(400).json({ error: 'Код товара должен быть положительным целым числом' });
+                        }
+                        fieldsToUpdate.push(`product_code = $${paramIndex++}`);
+                        values.push(code);
+                        break;
+
+                    default:
+                        return res.status(400).json({ error: `Поле "${field}" не поддерживается для обновления` });
+                }
+            }
+
+            console.log("AAAAAAAAAAAAAAAAAAAAAAA");
+            if (fieldsToUpdate.length === 0) {
+                return res.status(400).json({ error: 'Нет данных для обновления' });
+            }
+
+            console.log("AAAAAAAAAAAAAAAAAAAAAAA");
+            // Если изменили тип на штучный и не добавили price_for_grams — устанавливаем NULL
+            const wasTypeChangedToShT = updates.product_type && Number(updates.product_type) === 1;
+            if (wasTypeChangedToShT && !('price_for_grams' in updates)) {
+                fieldsToUpdate.push(`price_for_grams = $${paramIndex++}`);
+                values.push(null);
+            }
+
+            console.log("AAAAAAAAAAAAAAAAAAAAAAA");
+            const queryText = `
+            UPDATE Product 
+            SET ${fieldsToUpdate.join(', ')} 
+            WHERE product_id = $${paramIndex} 
+            RETURNING *
+        `;
+            values.push(product_id);
+
+            console.log("AAAAAAAAAAAAAAAAAAAAAAA");
+            console.log("AAAAAAAAAAAAAAAAAAAAAAA");
+            console.log("AAAAAAAAAAAAAAAAAAAAAAA");
+            console.log("AAAAAAAAAAAAAAAAAAAAAAA");
+            console.log("AAAAAAAAAAAAAAAAAAAAAAA");
+            console.log("AAAAAAAAAAAAAAAAAAAAAAA");
+            console.log("AAAAAAAAAAAAAAAAAAAAAAA");
+            console.log("AAAAAAAAAAAAAAAAAAAAAAA");
+            console.log("AAAAAAAAAAAAAAAAAAAAAAA");
+            console.log("AAAAAAAAAAAAAAAAAAAAAAA");
+
+            const updatedProduct = await db.query(queryText, values);
+
+            return res.status(200).json({
+                message: 'Товар успешно обновлён',
+                product: updatedProduct.rows[0],
+            });
+
+        } catch (err) {
+            console.error('Ошибка обновления товара:', err);
+            return res.status(500).json({
+                error: 'Ошибка сервера при обновлении товара',
+                details: err.message
+            });
+        }
+    }*/
+
+    /*async updateProduct(req, res) {
+        const { product_id, ...updates } = req.body;
+
+        // Проверка UUID
+        function isValidUUID(uuid) {
+            const regex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-5][0-9a-f]{3}-[089ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+            return regex.test(uuid);
+        }
+
+        try {
+            if (!product_id || !isValidUUID(product_id)) {
+                return res.status(400).json({ error: 'Неверный ID товара' });
+            }
+
+            const currentProduct = await db.query(
+                'SELECT * FROM Product WHERE product_id = $1',
+                [product_id]
+            );
+
+            if (currentProduct.rows.length === 0) {
+                return res.status(404).json({ error: 'Товар не найден' });
+            }
+
+            let fieldsToUpdate = [];
+            let values = [];
+            let paramIndex = 1;
+
+            for (const field in updates) {
+                const value = updates[field];
+
+                switch (field) {
+                    case 'product_name':
+                        if (typeof value !== 'string' || !value.trim()) {
+                            return res.status(400).json({ error: 'Название товара не может быть пустым' });
+                        }
+                        fieldsToUpdate.push(`product_name = $${paramIndex++}`);
+                        values.push(value.trim());
+                        break;
+
+                    case 'product_category_id':
+                        if (!isValidUUID(value)) {
+                            return res.status(400).json({ error: 'Неверный ID категории' });
+                        }
+
+                        const categoryExists = await db.query(
+                            'SELECT 1 FROM Category WHERE category_id = $1',
+                            [value]
+                        );
+
+                        if (categoryExists.rows.length === 0) {
+                            return res.status(400).json({ error: 'Категория не существует' });
+                        }
+
+                        fieldsToUpdate.push(`product_category_id = $${paramIndex++}`);
+                        values.push(value);
+                        break;
+
+                    case 'product_type':
+                        const numericType = Number(value);
+                        if (![1, 2].includes(numericType)) {
+                            return res.status(400).json({ error: 'Тип продукта должен быть 1 (штучный) или 2 (весовой)' });
+                        }
+
+                        // Обновление типа товара + сброс/установка price_for_grams
+                        fieldsToUpdate.push(`product_type = $${paramIndex++}`);
+                        values.push(numericType);
+
+                        if (numericType === 1) {
+                            // Штучный товар → устанавливаем price_for_grams = NULL
+                            fieldsToUpdate.push(`price_for_grams = $${paramIndex++}`);
+                            values.push(null);
+                        } else {
+                            // Весовой товар → если нет значения price_for_grams, ставим дефолтное
+                            if (!updates.price_for_grams || Number(updates.price_for_grams) <= 0) {
+                                fieldsToUpdate.push(`price_for_grams = $${paramIndex++}`);
+                                values.push(100);
+                            }
+                        }
+
+                        break;
+
+                    case 'product_price_unit':
+                        const priceUnit = parseFloat(value);
+                        if (isNaN(priceUnit) || priceUnit < 0) {
+                            return res.status(400).json({ error: 'Цена должна быть положительным числом' });
+                        }
+                        fieldsToUpdate.push(`price_unit = $${paramIndex++}`);
+                        values.push(priceUnit);
+                        break;
+
+                    case 'quantity':
+                        const quantity = parseInt(value);
+                        if (isNaN(quantity) || quantity < 0) {
+                            return res.status(400).json({ error: 'Количество должно быть неотрицательным целым числом' });
+                        }
+                        fieldsToUpdate.push(`quantity = $${paramIndex++}`);
+                        values.push(quantity);
+                        break;
+
+                    case 'price_for_grams':
+                        const priceForGrams = parseInt(value);
+                        if (isNaN(priceForGrams) || priceForGrams <= 0) {
+                            return res.status(400).json({ error: 'Цена за граммы должна быть положительным целым числом' });
+                        }
+                        if (currentProduct.rows[0].product_type !== 2) {
+                            return res.status(400).json({ error: 'Можно задать цену за граммы только для весового товара' });
+                        }
+                        fieldsToUpdate.push(`price_for_grams = $${paramIndex++}`);
+                        values.push(priceForGrams);
+                        break;
+
+                    case 'product_count_min':
+                        const countMin = parseFloat(value);
+                        if (isNaN(countMin) || countMin < 0) {
+                            return res.status(400).json({ error: 'Минимальное количество должно быть неотрицательным числом' });
+                        }
+                        fieldsToUpdate.push(`product_count_min = $${paramIndex++}`);
+                        values.push(countMin);
+                        break;
+
+                    case 'product_price_min':
+                        const priceMin = parseFloat(value);
+                        if (isNaN(priceMin) || priceMin < 0) {
+                            return res.status(400).json({ error: 'Минимальная цена должна быть неотрицательным числом' });
+                        }
+                        fieldsToUpdate.push(`product_price_min = $${paramIndex++}`);
+                        values.push(priceMin);
+                        break;
+
+                    case 'product_code':
+                        const code = parseInt(value);
+                        if (isNaN(code) || code <= 0) {
+                            return res.status(400).json({ error: 'Код товара должен быть положительным целым числом' });
+                        }
+                        fieldsToUpdate.push(`product_code = $${paramIndex++}`);
+                        values.push(code);
+                        break;
+
+                    default:
+                        return res.status(400).json({ error: `Поле "${field}" не поддерживается для обновления` });
+                }
+            }
+
+            if (fieldsToUpdate.length === 0) {
+                return res.status(400).json({ error: 'Нет данных для обновления' });
+            }
+
+            const queryText = `
+            UPDATE Product 
+            SET ${fieldsToUpdate.join(', ')} 
+            WHERE product_id = $${paramIndex} 
+            RETURNING *
+        `;
+            values.push(product_id);
+
+            const updatedProduct = await db.query(queryText, values);
+
+            return res.status(200).json({
+                message: 'Товар успешно обновлён',
+                product: updatedProduct.rows[0],
+            });
+
+        } catch (err) {
+            console.error('Ошибка обновления товара:', err);
+            return res.status(500).json({
+                error: 'Ошибка сервера при обновлении товара',
+                details: err.message
+            });
+        }
+    }*/
+
+
+
 
     // Удаление товара из БД
     async deleteProduct(req, res) {
@@ -277,7 +1119,6 @@ class adminController {
             res.status(500).json({error: 'Ошибка сервера'});
         }
     }
-
 
     // Функция поиска по названию
     async searchProduct(req, res) {
@@ -304,23 +1145,88 @@ class adminController {
         const {admin_id, product} = req.body
         let total = 0
 
-        product.forEach(element => {
-            total += element.price * element.quantity
+        try {
+            // Расчет общей суммы
+            product.forEach(element => {
+                if (element.price_for_grams)
+                    total += element.price * element.quantity / element.price_for_grams;
+                else
+                    total += element.price * element.quantity;
+            })
 
+            // Создание заказа
+            let time = new Date()
+            const newOrder = await db.query(`INSERT INTO orders (admin_id, createdat, status, total)
+            VALUES ($1, $2, $3, $4) RETURNING *`, [admin_id, time, 0, total])
+
+            console.log(total);
+
+            // Добавление товаров в заказ и обновление количества
+            for (const element of product) {
+                // Добавляем товар в заказ
+                await db.query(
+                    `INSERT INTO orderitems (order_id, product_id, quantity, price)
+                VALUES ($1, $2, $3, $4)`,
+                    [newOrder.rows[0].order_id, element.product_id, element.quantity, element.price]
+                );// менял element.price_for_grams ? element.price * element.quantity / element.price_for_grams : element.price * element.quantity
+
+                // Получаем информацию о товаре
+                const productInfo = await db.query(
+                    `SELECT * FROM PRODUCT WHERE product_id = $1`,
+                    [element.product_id]
+                );
+
+                // Обновляем количество товара
+                const updatedProduct = await db.query(
+                    `UPDATE Product SET quantity = $1 WHERE product_id = $2 RETURNING *`,
+                    [productInfo.rows[0].quantity - element.quantity, element.product_id]
+                );
+
+                // Проверяем минимальное количество (исправленная строка)
+                if (updatedProduct.rows[0].quantity < productInfo.rows[0].product_count_min) {
+                    await db.query(
+                        `UPDATE Product SET product_status = $1 WHERE product_id = $2`,
+                        [0, element.product_id]
+                    );
+                }
+            }
+
+            res.status(201).json({message: "Заказ создан"})
+        } catch (err) {
+            console.error('Error in createOrder:', err);
+            res.status(500).json({message: err.message || 'Ошибка при создании заказа'});
+        }
+    }
+
+
+
+   /* async createOrder(req, res) {
+        const {admin_id, product} = req.body
+        let total = 0
+
+        console.error('AAAAAAAAAAAAAAAAAAAA');
+        product.forEach(element => {
+            if (element.price_for_grams)
+                total += element.price * element.quantity / element.price_for_grams;
+            else
+                total += element.price * element.quantity;
         })
 
+        console.error('AAAAAAAAAAAAAAAAAAAA');
         let time = new Date()
         const newOrder = await db.query(`INSERT INTO orders (admin_id, createdat, status, total)
-             VALUES ($1, $2, $3, $4) RETURNING *`, [admin_id, time, 0, total])
+            VALUES ($1, $2, $3, $4) RETURNING *`, [admin_id, time, 0, total])
 
+        console.error('AAAAAAAAAAAAAAAAAAAA');
         try {
             for (const element of product) {
                 await db.query(
                     `INSERT INTO orderitems (order_id, product_id, quantity, price)
-                 VALUES ($1, $2, $3, $4)`,
+                VALUES ($1, $2, $3, $4)`,
                     [newOrder.rows[0].order_id, element.product_id, element.quantity, element.price]
                 );
 
+                console.error('AAAAAAAAAAAAAAAAAAAA');
                 const information = await db.query(
                     `SELECT * FROM PRODUCT WHERE product_id = $1`,
                     [element.product_id]
@@ -331,42 +1237,65 @@ class adminController {
                     [information.rows[0].quantity - element.quantity, element.product_id]
                 );
 
-                if (updateproduct.rows[0].quantity < 20) {
+                if (updateproduct.rows[0].quantity < element.rows[0].product_count_min) {
                     await db.query(
                         `UPDATE Product SET product_status = $1 WHERE product_id = $2`,
                         [0, element.product_id]
                     );
                 }
             }
+            console.error('AAAAAAAAAAAAAAAAAAAA2');
             res.status(201).json({message: "Заказ создан"})
         } catch (err) {
             res.status(500)
         }
-    }
+    }*/
+
 
 
     async deleteOrder(req, res) {
-        const { order_id } = req.body;
-
+        const {order_id} = req.body;
         if (!order_id) {
             return res.status(400).json({ error: "Не указан order_id" });
         }
 
+        const client = await db.connect(); // Подключаемся к клиенту для транзакций
+
         try {
+
+            await client.query('BEGIN'); // Начало транзакции
+            const orderProducts = await client.query(`SELECT * FROM orderitems WHERE order_id = $1`, [order_id]);
+
+            await Promise.all(
+                orderProducts.rows.map(async (item) => {
+                    await client.query(
+                        `UPDATE product SET quantity = quantity + $1 WHERE product_id = $2`,
+                        [item.quantity, item.product_id]
+                    );
+                })
+            );
+
             // Удалите сначала OrderItems, чтобы не нарушать внешние ключи
-            await db.query('DELETE FROM orderitems WHERE order_id = $1', [order_id]);
+            await client.query('DELETE FROM orderitems WHERE order_id = $1', [order_id]);
+
 
             // Затем удалите сам заказ
-            const result = await db.query('DELETE FROM orders WHERE order_id = $1 RETURNING *', [order_id]);
+            const result = await client.query('DELETE FROM orders WHERE order_id = $1 RETURNING *', [order_id]);
 
             if (result.rowCount === 0) {
+                await client.query('ROLLBACK'); // Откат, если заказа нет
                 return res.status(404).json({ error: "Заказ не найден" });
             }
-
+            await client.query('COMMIT'); // Фиксация изменений
             res.json({ message: "Заказ успешно удален", order: result.rows[0] });
         } catch (err) {
+            await client.query('ROLLBACK'); // Откат при ошибке
             console.error("Ошибка при удалении заказа:", err);
             res.status(500).json({ error: "Внутренняя ошибка сервера" });
+        }
+        finally{
+            client.release(); // Освобождаем клиент
+
         }
     }
 
@@ -525,7 +1454,13 @@ class adminController {
                         [product.quantity, product.product_id]
                     );
 
-                    total += product.price * product.quantity;
+                    if (product.price_for_grams) {
+
+                        total += product.price * product.quantity / product.price_for_grams;
+                    }
+                    else {
+                        total += product.price * product.quantity;
+                    }
                 }
 
                 // Обновляем общую сумму заказа
@@ -586,32 +1521,123 @@ class adminController {
         }
     }
 
-
     // Генерация отчета за день.
     async generateDailyReport(req, res) {
         const day = req.body
         const daily = day["day"].split('.').reverse().join('-')
-        console.log(daily)
         const Orders = await db.query(`SELECT * FROM orders WHERE createdat::date = $1`, [daily])
-        console.log(Orders.rows[0], "A")
+
+
+        res.setHeader(
+            'Content-Type',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        );
+        res.setHeader(
+            'Content-Disposition',
+            'attachment; filename="reportDaily.xlsx"'
+        );
+
 
         await reportHelpers.foo([Orders.rows[0]], "Чайная Лавка", daily)
-        res.status(200).send("OOOO")
     }
 
-    async generateProductReport(req, res) {
-        const {status} = req.body;
-        try {
-            let query = 'SELECT * FROM Product';
-            let params = [];
 
-            // В зависимости от статуса изменяем запрос
-            if (status !== 'all') {
-                query += ' WHERE status = $1';
-                params.push(status);
+
+
+    async generateProductReport(req, res) {
+        try {
+            const { status } = req.body;
+
+            let query = 'SELECT * FROM product';
+            let queryParams = [];
+
+            if (status === 'need') {
+                query += ' WHERE product_status = $1';
+                queryParams.push(0);
+            } else if (status === 'have') {
+                query += ' WHERE product_status = $1';
+                queryParams.push(1);
             }
 
-            const Products = await db.query(query, params);
+            // Если status === 'all' или не указан — выбираем всё без фильтрации
+            const result = await db.query(query, queryParams);
+
+            res.setHeader(
+                'Content-Type',
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            );
+            res.setHeader(
+                'Content-Disposition',
+                'attachment; filename="report.xlsx"'
+            );
+
+            await reportHelpers.generateProduct(result.rows, res);
+
+        } catch (err) {
+            console.error("Ошибка при генерации отчёта:", err);
+            res.status(500).json({ message: "Ошибка на сервере", error: err.message });
+        }
+    }
+   /* async generateProductReport(req, res) {
+        try {
+            const { status } = req.body;
+            console.log("Получили статус:", status); // просто логируем
+
+            const Products = await db.query(`SELECT * FROM product`);
+
+            res.setHeader(
+                'Content-Type',
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            );
+            res.setHeader(
+                'Content-Disposition',
+                'attachment; filename="report.xlsx"'
+            );
+
+            await reportHelpers.generateProduct(Products.rows, res);
+
+        } catch (err) {
+            console.error("Ошибка при генерации отчёта:", err);
+            res.status(500).json({ message: "Ошибка на сервере", error: err.message });
+        }
+    }*/
+    /*async generateProductReport(req, res) {
+        try {
+            const { status } = req.body;
+
+            if (!status) {
+                return res.status(400).json({ message: "Не указан статус" });
+            }
+
+            const Products = await db.query(
+                `SELECT * FROM product WHERE product_status = $1`,
+                [status]
+            );
+
+            // Устанавливаем заголовки
+            res.setHeader(
+                'Content-Type',
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            );
+            res.setHeader(
+                'Content-Disposition',
+                'attachment; filename="report.xlsx"'
+            );
+
+            // Генерируем файл и сразу отправляем его через res
+            await reportHelpers.generateProduct(Products.rows, res);
+
+        } catch (err) {
+            console.error("Ошибка при генерации отчёта:", err);
+            res.status(500).json({ message: "Ошибка на сервере", error: err.message });
+        }
+    }*/
+
+
+   /* async generateProductReport(req, res) {
+        const {status} = req.body;
+        try {
+            const Products = await db.query(`SELECT * FROM Product WHERE status = $1`, status);
 
             // Настраиваем заголовки ответа перед генерацией файла
             res.setHeader(
@@ -626,12 +1652,119 @@ class adminController {
             // Генерируем и отправляем файл
             await reportHelpers.generateProduct(Products.rows, res);
 
-            // Не нужно отправлять res.status(201).send(file), так как generateProduct уже отправляет ответ
+
         } catch (err) {
             console.log("Ошибка - ", err);
             res.status(500).json({message: "Ошибка на сервере"});
         }
+    }*/
+
+
+
+
+
+
+    async generateReport(req, res){
+
+
+        const { status, startDate = null, endDate = null} = req.body;
+        try {
+
+            const Products = await db.query(`SELECT * FROM product`);
+
+            res.setHeader(
+                'Content-Type',
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            );
+            res.setHeader(
+                'Content-Disposition',
+                'attachment; filename="report.xlsx"'
+            );
+
+            await reportHelpers.generateProduct(Products.rows, res);
+
+        } catch (err) {
+            console.error("Ошибка при генерации отчёта:", err);
+            res.status(500).json({ message: "Ошибка на сервере", error: err.message });
+        }
+
+        const start = startDate.split('.').reverse().join('-')
+        const end = endDate.split('.').reverse().join('-')
+        let itemsorders = []
+        try{
+            // Получаем все необходимые данные одним запросом с JOIN
+            const reportData = await db.query(`
+            SELECT 
+                Orders.order_id AS "order_id",
+                Orders.createdat AS "order_date",
+                Orders.total AS "order_total",
+                Product.product_name AS "product_name",
+                CASE 
+                    WHEN Product.product_type = 1 THEN 'штук'
+                    WHEN Product.product_type = 2 THEN 'грамм'
+                END AS "product_type",
+                OrderItems.quantity AS "quantity",
+                OrderItems.price AS "item_price"
+            FROM Orders
+            JOIN OrderItems ON Orders.order_id = OrderItems.order_id
+            JOIN Product ON OrderItems.product_id = Product.product_id
+            WHERE Orders.createdat::date BETWEEN $1 AND $2
+            ORDER BY Orders.order_id, Orders.createdat
+        `, [start, end]);
+
+            if (reportData.rows.length === 0) {
+                return res.status(404).json({message: "Нет данных за указанный период"});
+            }
+
+            // Формируем структуры данных для отчета
+            const summary = []; // Сводка по заказам
+            const details = []; // Детализация по товарам
+            const ordersMap = new Map(); // Для группировки по заказам
+
+            reportData.rows.forEach(row => {
+                const orderId = row.order_id;
+
+                // Добавляем в сводный отчет (если заказ еще не добавлен)
+                if (!ordersMap.has(orderId)) {
+                    ordersMap.set(orderId, true);
+                    summary.push({
+                        "Номер заказа": orderId,
+                        "Дата заказа": new Date(row.order_date).toLocaleDateString('ru-RU'),
+                        "Сумма заказа": row.order_total
+                    });
+                }
+
+                // Добавляем в детализацию
+                details.push({
+                    "Номер заказа": orderId,
+                    "Название товара": row.product_name,
+                    "Тип товара": row.product_type,
+                    "Количество": row.quantity,
+                    "Цена за единицу": row.item_price,
+                    "Сумма": row.quantity * row.item_price
+                });
+            });
+
+            // Настройка заголовков для скачивания
+            res.setHeader(
+                'Content-Type',
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            );
+            res.setHeader(
+                'Content-Disposition',
+                `attachment; filename="revenue_report_${startDate}_${endDate}.xlsx"`
+            );
+
+            // Генерация отчета
+            await reportHelpers.generateReportRevenueForPeriod(summary, details, start, end, res);
+        }
+        catch(err){
+            console.error("Ошибка при генерации отчёта:", err);
+            res.status(500).json({message: "Ошибка на сервере"});
+        }
+
     }
+
 }
 
 module.exports = new adminController();

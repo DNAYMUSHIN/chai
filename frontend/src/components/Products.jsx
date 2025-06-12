@@ -195,6 +195,10 @@ const Products = () => {
     };
 
     const handleAddProduct = async (productData) => {
+
+
+        console.log(productData);
+
         try {
             setLoading(true);
             const response = await fetch(API_URL.add, {
@@ -218,6 +222,30 @@ const Products = () => {
     const handleUpdateProduct = async (productId, updates) => {
         try {
             setLoading(true);
+
+            const response = await fetch(API_URL.update, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ product_id: productId, ...updates })
+            });
+
+            if (!response.ok) throw new Error('Ошибка при обновлении товара');
+
+            await fetchProducts();
+            return true;
+        } catch (err) {
+            console.error("Ошибка при обновлении товара:", err);
+            setError("Не удалось обновить товар. Попробуйте позже.");
+            return false;
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    /*const handleUpdateProduct = async (productId, updates) => {
+
+        try {
+            setLoading(true);
             for (const [field, value] of Object.entries(updates)) {
                 const response = await fetch(API_URL.update, {
                     method: 'PUT',
@@ -235,7 +263,7 @@ const Products = () => {
         } finally {
             setLoading(false);
         }
-    };
+    };*/
 
     const handleDeleteProduct = async (productId) => {
         try {

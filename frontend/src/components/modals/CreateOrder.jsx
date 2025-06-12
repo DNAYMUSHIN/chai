@@ -30,12 +30,12 @@ const CreateOrder = (props) => {
             const items = props.order.items ||
                 (props.order.products ? props.order.products.map(p => ({
                     product_id: p.product_id,
-                    id: p.product_id,
                     name: p.product_name,
                     price: p.price,
                     quantity: p.quantity,
 
-                    total: calculateItemTotal(p.price, p.quantity, p.price_for_grams),
+                    total: p.total,
+                    /*total: calculateItemTotal(p.price, p.quantity, p.price_for_grams),*/
 
                     quantityInStock: p.quantityInStock,
                     product_type: p.product_type,
@@ -55,8 +55,56 @@ const CreateOrder = (props) => {
         return (price * quantity) / priceForGrams;
     };
 
+
+
     const handleAddItem = (product) => {
-        const existingItem = orderItems.find(item => item.product_id === product.product_id);
+        const productId = product.product_id; // ← используем правильное поле
+
+
+        const existingItem = orderItems.find(item => item.product_id === productId);
+
+        if (existingItem) {
+            const newQuantity = existingItem.quantity + 1;
+            if (product.quantity !== null && newQuantity > product.quantityInStock) {
+                alert(`Недостаточно товара на складе. Доступно: ${product.quantityInStock}`);
+                return;
+            }
+            setOrderItems(prev =>
+                prev.map(item =>
+                    item.product_id === productId
+                        ? {
+                            ...item,
+                            quantity: newQuantity,
+                            total: calculateItemTotal(item.price, newQuantity, item.price_for_grams)
+                        }
+                        : item
+                )
+            );
+        } else {
+            if (product.quantity !== null && 1 > product.quantityInStock) {
+                alert(`Недостаточно товара на складе. Доступно: ${product.quantityInStock}`);
+                return;
+            }
+            setOrderItems(prev => [
+                ...prev,
+                {
+                    ...product,
+                    product_id: productId, // ← присваиваем product_id для корректного поиска
+                    quantity: 1,
+                    total: calculateItemTotal(product.price, 1, product.price_for_grams)
+                }
+            ]);
+        }
+    };
+    /*const handleAddItem = (product) => {
+        /!*const existingItem = orderItems.find(item => item.product_id === product.product_id);
+
+        const existingItem = orderItems.find(
+            item => item.product_id === product.product_id
+        );
+
+
+
         if (existingItem) {
             const newQuantity = existingItem.quantity + 1;
             if (product.quantity !== null && newQuantity > product.quantityInStock) {
@@ -88,7 +136,7 @@ const CreateOrder = (props) => {
                 }
             ]);
         }
-    };
+    };*/
 
     const handleQuantityChange = (itemId, newQuantity) => {
         if (newQuantity < 1) return;
@@ -135,7 +183,13 @@ const CreateOrder = (props) => {
 
 
     const calculateTotal = () => {
-        return orderItems.reduce((sum, item) => sum + calculateItemTotal(item.price, item.quantity, item.price_for_grams), 0);
+
+        return orderItems.reduce((sum, item) => sum + item.total, 0);
+        /*return orderItems.reduce((sum, item) => sum + calculateItemTotal(item.price, item.quantity, item.price_for_grams), 0);*/
+    };
+
+    const sumTotal = () => {
+        return orderItems.reduce((sum, item) => sum + item.total, 0);
     };
 
     const handleSubmit = async () => {
@@ -143,7 +197,7 @@ const CreateOrder = (props) => {
             order_id: props.order?.order_id,
             status: props.order?.status || 0,
             items: orderItems.map(item => {
-                const productId = item.product_id || item.id;
+                const productId = item.product_id;
                 if (!productId) {
                     console.error("Ошибка: product_id не найден у товара", item);
                     throw new Error("Нельзя отправить товар без product_id");
@@ -151,7 +205,8 @@ const CreateOrder = (props) => {
                 return {
                     product_id: productId,
                     quantity: item.quantity,
-                    price: item.price || 0
+                    price: item.price || 0,
+                    price_for_grams: item.price_for_grams,
                 };
             }),
             total: calculateTotal()
@@ -205,15 +260,13 @@ const CreateOrder = (props) => {
                 throw new Error("Неверный формат данных товара");
             }
 
-            console.log(product.quantity)
-
             handleAddItem({
                 ...product,
-                id: product.product_id,
+                product_id: product.product_id,
                 name: product.product_name || "Неизвестный товар",
                 price: product.price_unit || 0,
                 quantity: 1,
-                total: product.price_unit || 0,
+                total: 0,
                 quantityInStock: product.quantity,
                 product_type: product.product_type,
                 price_for_grams: product.price_for_grams,
@@ -231,14 +284,74 @@ const CreateOrder = (props) => {
         }
     };
 
+
     const handleQuantityInputChange = (itemId, e) => {
+        const value = e.target.value;
+
+        // Разрешаем ввод только чисел и пустой строки
+        if (/^\d*$/.test(value)) {
+            setOrderItems(prev =>
+                prev.map(item =>
+                    item.product_id === itemId
+                        ? {
+                            ...item,
+                            quantity: value, // Сохраняем как строку, чтобы позволить пустое значение
+                            total: value === '' || isNaN(value)
+                                ? 0
+                                : calculateItemTotal(item.price, parseInt(value, 10), item.price_for_grams)
+                        }
+                        : item
+                )
+            );
+        }
+    };
+
+    const handleQuantityInputBlur = (itemId) => {
+        const item = orderItems.find(i => i.product_id === itemId);
+
+        if (!item) return;
+
+        const inputValue = item.quantity;
+        const parsedValue = parseInt(inputValue, 10);
+
+        let newQuantity;
+
+        if (isNaN(parsedValue) || parsedValue < 1) {
+            newQuantity = 1;
+        } else {
+            newQuantity = parsedValue;
+        }
+
+        // Проверка наличия на складе
+        if (item.quantityInStock !== null && newQuantity > item.quantityInStock) {
+            alert(`Недостаточно товара на складе. Доступно: ${item.quantityInStock}`);
+            newQuantity = item.quantityInStock;
+        }
+
+        // Обновляем с корректным числом
+        setOrderItems(prev =>
+            prev.map(i =>
+                i.product_id === itemId
+                    ? {
+                        ...i,
+                        quantity: newQuantity,
+                        total: calculateItemTotal(i.price, newQuantity, i.price_for_grams)
+                    }
+                    : i
+            )
+        );
+
+        setIsEditingQuantity(false);
+    };
+
+    /*const handleQuantityInputChange = (itemId, e) => {
         const value = e.target.value;
         // Проверяем, что введено число и оно не отрицательное
         if (/^\d*$/.test(value)) {
             const newQuantity = value === '' ? 0 : parseInt(value, 10);
             handleQuantityChange(itemId, newQuantity);
         }
-    };
+    };*/
 
     return (
         <Modal
@@ -332,7 +445,17 @@ const CreateOrder = (props) => {
                                         {formatPrice(item)}
                                     </p>
                                     <p className="detail__amount item__info">
+
                                         <Input
+                                            type="text" // Меняем на text, чтобы можно было стирать полностью
+                                            value={item.quantity}
+                                            onChange={(e) => handleQuantityInputChange(item.product_id, e)}
+                                            onBlur={() => handleQuantityInputBlur(item.product_id)} // При выходе фиксируем min=1
+                                            onFocus={() => setIsEditingQuantity(true)}
+                                            className="quantity-input"
+                                        />
+
+                                        {/*<Input
                                             type="number"
                                             min="1"
                                             value={item.quantity}
@@ -340,7 +463,7 @@ const CreateOrder = (props) => {
                                             className="quantity-input"
                                             onFocus={() => setIsEditingQuantity(true)}
                                             onBlur={() => setIsEditingQuantity(false)}
-                                        />
+                                        />*/}
                                         {item.product_type === 1? "шт." : "гр."}
                                         <Button
                                             className="button button_add"
@@ -370,9 +493,16 @@ const CreateOrder = (props) => {
 
                 {orderItems.length > 0 && (
                     <div className="order-total">
-                    Итого: {calculateTotal()} руб.
+                        Итого:&#160;
+                        {props.type === "create" ?
+                            calculateTotal().toFixed(2) :
+                            sumTotal().toFixed(2)
+                        }&#160;руб.
+
                     </div>
                 )}
+
+
 
                 <div className="button-create-wrapper">
                     <Button

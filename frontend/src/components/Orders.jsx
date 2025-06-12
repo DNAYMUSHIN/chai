@@ -42,6 +42,10 @@ const Orders = () => {
     };
 
     const handleOpenEdit = (order) => {
+
+        console.log(order);
+
+
         setActionType('edit');
         setCurrentOrder({
             ...order,
@@ -51,14 +55,12 @@ const Orders = () => {
                     console.warn("Пропущен товар без product_id", product);
                     return null;
                 }
-                console.log(product)
                 return {
                     product_id: productId,
-                    id: productId,
                     name: product.product_name || product.name || 'Без названия',
                     price: parseFloat(product.price) || 0,
                     quantity: product.quantity || 1,
-                    total: parseFloat(product.price) * (product.quantity || 1),
+                    total: product.price_for_grams ? product.price * product.quantity / product.price_for_grams : product.price * product.quantity/* parseFloat(product.price) * (product.quantity || 1)*/,
                     quantityInStock: product.quantityInStock,
                     product_type: product.product_type,
                     price_for_grams: product.price_for_grams,
@@ -74,7 +76,7 @@ const Orders = () => {
         setOpenOrderModal(true);
     };*/
 
-    const handleAddOrder = async (newOrder) => {
+   const handleAddOrder = async (newOrder) => {
         try {
             const response = await fetch('/api/order/create', {
                 method: 'POST',
@@ -87,7 +89,8 @@ const Orders = () => {
                     product: newOrder.items.map(item => ({
                         product_id: item.product_id, // ← Используем product_id напрямую
                         quantity: item.quantity,
-                        price: parseInt(item.price)
+                        price: parseInt(item.price),
+                        price_for_grams: item.price_for_grams,
                     }))
                 })
             });
@@ -99,7 +102,7 @@ const Orders = () => {
 
            /* const createdOrder = await response.json();
             setOrders(prev => [...prev, createdOrder]);
-*/
+            */
             loadOrders();
 
             // Закрываем модальное окно после успешного создания
@@ -124,7 +127,8 @@ const Orders = () => {
                     products: updatedOrder.items.map(item => ({
                         product_id: item.product_id,
                         quantity: parseInt(item.quantity, 10),
-                        price: parseFloat(item.price)
+                        price: parseFloat(item.price),
+                        price_for_grams: parseFloat(item.price_for_grams)
                     }))
                 })
             });
