@@ -42,6 +42,10 @@ const Orders = () => {
     };
 
     const handleOpenEdit = (order) => {
+
+        console.log(order);
+
+
         setActionType('edit');
         setCurrentOrder({
             ...order,
@@ -53,11 +57,14 @@ const Orders = () => {
                 }
                 return {
                     product_id: productId,
-                    id: productId,
                     name: product.product_name || product.name || 'Без названия',
                     price: parseFloat(product.price) || 0,
                     quantity: product.quantity || 1,
-                    total: parseFloat(product.price) * (product.quantity || 1)
+                    total: product.price_for_grams ? product.price * product.quantity / product.price_for_grams : product.price * product.quantity/* parseFloat(product.price) * (product.quantity || 1)*/,
+                    quantityInStock: product.quantityInStock,
+                    product_type: product.product_type,
+                    price_for_grams: product.price_for_grams,
+                    product_count_min: product.product_count_min
                 };
             }).filter(Boolean) : []
         });
@@ -69,7 +76,7 @@ const Orders = () => {
         setOpenOrderModal(true);
     };*/
 
-    const handleAddOrder = async (newOrder) => {
+   const handleAddOrder = async (newOrder) => {
         try {
             const response = await fetch('/api/order/create', {
                 method: 'POST',
@@ -82,7 +89,8 @@ const Orders = () => {
                     product: newOrder.items.map(item => ({
                         product_id: item.product_id, // ← Используем product_id напрямую
                         quantity: item.quantity,
-                        price: parseInt(item.price)
+                        price: parseInt(item.price),
+                        price_for_grams: item.price_for_grams,
                     }))
                 })
             });
@@ -94,7 +102,7 @@ const Orders = () => {
 
            /* const createdOrder = await response.json();
             setOrders(prev => [...prev, createdOrder]);
-*/
+            */
             loadOrders();
 
             // Закрываем модальное окно после успешного создания
@@ -119,7 +127,8 @@ const Orders = () => {
                     products: updatedOrder.items.map(item => ({
                         product_id: item.product_id,
                         quantity: parseInt(item.quantity, 10),
-                        price: parseFloat(item.price)
+                        price: parseFloat(item.price),
+                        price_for_grams: parseFloat(item.price_for_grams)
                     }))
                 })
             });
@@ -131,32 +140,6 @@ const Orders = () => {
             alert(err.message);
         }
     };
-    /*const handleUpdateOrder = async (updatedOrder) => {
-        try {
-            const response = await fetch('/api/order/status', {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
-                },
-                body: JSON.stringify({
-                    order_id: updatedOrder.order_id,
-                    status: updatedOrder.status
-                })
-            });
-
-            if (!response.ok) throw new Error('Ошибка обновления заказа');
-
-            setOrders(prev =>
-                prev.map(order =>
-                    order.order_id === updatedOrder.order_id ? updatedOrder : order
-                )
-            );
-        } catch (err) {
-            console.error(err);
-            alert(err.message);
-        }
-    };*/
 
     const handleStatusChange = async (orderId, newStatus) => {
         try {
@@ -174,12 +157,7 @@ const Orders = () => {
 
             if (!response.ok) throw new Error('Ошибка обновления статуса');
 
-            /*const updatedOrder = await response.json();
-            setOrders(prev =>
-                prev.map(order =>
-                    order.order_id === orderId ? updatedOrder : order
-                )
-            );*/
+
 
             loadOrders();
         } catch (err) {
@@ -200,12 +178,47 @@ const Orders = () => {
     const filteredOrders = orders.filter(order => {
         if (!order) return false; // Защита от undefined
 
-        const orderId = order.order_id ? order.order_id.toString() : '';
+        // Берем последние 6 символов order_id или всю строку, если она короче
+        const orderIdLast6 = order.order_id
+            ? order.order_id.toString().slice(-6)
+            : '';
         const statusText = getStatusText(order.status || 0).toLowerCase();
         const search = searchTerm.toLowerCase();
 
-        return orderId.includes(search) || statusText.includes(search);
+        return orderIdLast6.includes(search) || statusText.includes(search);
     });
+
+    const handleDeleteOrder = async (orderId) => {
+        const confirmDelete = window.confirm("Вы уверены, что хотите удалить этот заказ?");
+        if (!confirmDelete) return;
+
+        try {
+            const response = await fetch('/api/order/delete', {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                },
+                body: JSON.stringify({ order_id: orderId })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || 'Ошибка удаления заказа');
+            }
+
+            const result = await response.json();
+            console.log("Заказ удален:", result);
+
+            // Обновляем список заказов
+            loadOrders();
+
+        } catch (err) {
+            console.error(err);
+            alert(err.message || 'Не удалось удалить заказ');
+        }
+    };
+
     return (
         <section className="workspace orders">
             <CreateOrder
@@ -252,7 +265,7 @@ const Orders = () => {
                     <ul className="workspace__list orders-list">
                         {filteredOrders.map((order) => (
                             <li key={order.order_id} className="workspace__item order orders-list__item">
-                                <p className="order__number order__info">#{order.order_id}</p>
+                                <p className="order__number order__info">#{order.order_id.slice(-6)}</p>
                                 <Select
                                     value={order.status}
                                     onChange={(e) => handleStatusChange(order.order_id, e.target.value)}
@@ -264,12 +277,23 @@ const Orders = () => {
                                 </Select>
                                 <p className="order__date order__info">{new Date(order.createdat).toLocaleString('ru-RU')}</p>
                                 <p className="order__total order__info">{order.total} руб.</p>
-                                <Button
-                                    onClick={() => handleOpenEdit(order)}
-                                    className="change button order__info"
-                                >
-                                    Подробности
-                                </Button>
+                               <div className="button-wrapper">
+
+                                   <Button
+                                       onClick={() => handleOpenEdit(order)}
+                                       className="change button order__info"
+                                   >
+                                       Подробности
+                                   </Button>
+
+                                   <Button
+                                       onClick={() => handleDeleteOrder(order.order_id)}
+                                       className="button button_remove order__info"
+                                       style={{ marginLeft: '1rem' }}
+                                   >
+                                       Удалить
+                                   </Button>
+                               </div>
                                 {/*<div className="order-products">
                                     {order.products && order.products.map((product, index) => (
                                         <div key={index} className="product-item">

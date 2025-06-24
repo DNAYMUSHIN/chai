@@ -84,47 +84,91 @@ async function getHundredsTensUnits(num, units, teens, tens, hundreds = null) {
 
 
 async function generateProduct(products, res, buyer = 'ЧАЙНАЯ ЛАВКА'){
-  const data = new Date()
-  const d = data.toISOString().slice(0, 10).split('-').reverse().join(".")
-  try{
-    const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet(`Отчет по товарам ${d}`);
+    const data = new Date()
+    const d = data.toISOString().slice(0, 10).split('-').reverse().join(".")
+    try{
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet(`Отчет по товарам ${d}`);
         worksheet.columns = [
-        { width: 5 },  // №
-        { width: 25 }, // Товар
-        { width: 10 }, // Кол-во
-        { width: 5 },  // Ед.
-        { width: 10 }, // Цена
-        { width: 10 }  // Сумма
-      ];
+            { width: 5 },  // №
+            { width: 25 }, // Товар
+            { width: 10 }, // Кол-во
+            { width: 5 },  // Ед.
+            { width: 10 }, // Цена
+            { width: 10 }  // Сумма
+        ];
 
-    worksheet.mergeCells('A1:F1');
-    worksheet.getCell('A1').value = `Отчет на день - ${d}`;
-    worksheet.getCell('A1').font = { bold: true, size: 14 };
-    worksheet.getCell('A1').alignment = { horizontal: 'center' };
+        worksheet.mergeCells('A1:F1');
+        worksheet.getCell('A1').value = `Отчет на день - ${d}`;
+        worksheet.getCell('A1').font = { bold: true, size: 14 };
+        worksheet.getCell('A1').alignment = { horizontal: 'center' };
 
-    const headerRow = worksheet.addRow(['№', 'Товар', 'Количество', 'Ед.', 'Цена', 'Сумма']);
-    headerRow.font = { bold: true };
-    headerRow.alignment = { horizontal: 'center' };
-    headerRow.eachCell(cell => {
-      cell.border = {
-        top: { style: 'thin' },
-        left: { style: 'thin' },
-        bottom: { style: 'thin' },
-        right: { style: 'thin' }
-      };
-    });
+        const headerRow = worksheet.addRow(['№', 'Товар', 'Количество', 'Ед.', 'Цена', 'Сумма']);
+        headerRow.font = { bold: true };
+        headerRow.alignment = { horizontal: 'center' };
+        headerRow.eachCell(cell => {
+            cell.border = {
+                top: { style: 'thin' },
+                left: { style: 'thin' },
+                bottom: { style: 'thin' },
+                right: { style: 'thin' }
+            };
+        });
 
 
-    fillingcell(worksheet, products)
+        fillingcell(worksheet, products)
 
-    await workbook.xlsx.write(res)
-  }
-  catch(err){
-    console.log("Ошибка - ", err)
-    throw err
-  }
+        await workbook.xlsx.write(res)
+    }
+    catch(err){
+        console.log("Ошибка - ", err)
+        throw err
+    }
 }
+
+
+async function generateReportRevenueForPeriod(orders, products, start, end, res, buyer = "ЧАЙНАЯ ЛАВКА") {
+    try {
+        const workbook = new ExcelJS.Workbook();
+
+        // 1. Создаем лист со сводкой по заказам
+        const summarySheet = workbook.addWorksheet('Сводка по заказам');
+        summarySheet.columns = [
+            { header: 'Номер заказа', key: 'Номер заказа', width: 20 },
+            { header: 'Дата заказа', key: 'Дата заказа', width: 15 },
+            { header: 'Сумма заказа', key: 'Сумма заказа', width: 15, style: { numFmt: '#,##0.00' } }
+        ];
+        summarySheet.addRows(summaryData);
+
+        // Добавляем итоговую сумму
+        const totalSum = summaryData.reduce((sum, order) => sum + parseFloat(order["Сумма заказа"]), 0);
+        summarySheet.addRow({
+            "Номер заказа": "ИТОГО:",
+            "Сумма заказа": totalSum
+        });
+
+        // 2. Создаем лист с детализацией товаров
+        const detailSheet = workbook.addWorksheet('Детализация товаров');
+        detailSheet.columns = [
+            { header: 'Номер заказа', key: 'Номер заказа', width: 20 },
+            { header: 'Название товара', key: 'Название товара', width: 40 },
+            { header: 'Тип товара', key: 'Тип товара', width: 15 },
+            { header: 'Количество', key: 'Количество', width: 12 },
+            { header: 'Цена за единицу', key: 'Цена за единицу', width: 15, style: { numFmt: '#,##0.00' } },
+            { header: 'Сумма', key: 'Сумма', width: 15, style: { numFmt: '#,##0.00' } }
+        ];
+        detailSheet.addRows(detailData);
+
+        // 3. Записываем книгу в ответ
+        await workbook.xlsx.write(res);
+        res.end();
+
+    } catch (error) {
+        console.error("Ошибка при генерации Excel:", error);
+        throw error;
+    }
+}
+
 
 async function foo(products, buyer = 'ЧАЙНАЯ ЛАВКА', day) {
 
@@ -132,124 +176,99 @@ async function foo(products, buyer = 'ЧАЙНАЯ ЛАВКА', day) {
     const d = data.toISOString().slice(0, 10).split('-').reverse().join(".")
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet(`Отчет по продажам за ${day}`);
-  
+
     // Настройка колонок
     worksheet.columns = [
-      { width: 5 },  // №
-      { width: 25 }, // Товар
-      { width: 10 }, // Кол-во
-      { width: 5 },  // Ед.
-      { width: 10 }, // Цена
-      { width: 10 }  // Сумма
+        { width: 5 },  // №
+        { width: 25 }, // Товар
+        { width: 10 }, // Кол-во
+        { width: 5 },  // Ед.
+        { width: 10 }, // Цена
+        { width: 10 }  // Сумма
     ];
-  
+
     // Заголовок
     worksheet.mergeCells('A1:F1');
     worksheet.getCell('A1').value = `Отчет за день - ${d}`;
     worksheet.getCell('A1').font = { bold: true, size: 14 };
     worksheet.getCell('A1').alignment = { horizontal: 'center' };
-  
+
     // Покупатель и поставщик
     // worksheet.mergeCells('A3:F3');
     // worksheet.getCell('A3').value = 'Покупатель:';
     // worksheet.getCell('A3').font = { bold: true };
-  
+
     worksheet.mergeCells('A4:G4');
     worksheet.getCell('A4').value = `"${buyer}"`;
     worksheet.getCell('A4').alignment = { horizontal: 'center' };
-  
+
     // worksheet.mergeCells('A5:F5');
     // worksheet.getCell('A5').value = 'Поставщик:';
     // worksheet.getCell('A5').font = { bold: true };
-  
+
     // worksheet.mergeCells('A6:F6');
     // worksheet.getCell('A6').value = '"______"';
     // worksheet.getCell('A6').alignment = { horizontal: 'center' };
-  
+
     // Шапка таблицы
     const headerRow = worksheet.addRow(['№', 'Товар', 'Количество', 'Ед.', 'Цена', 'Сумма']);
     headerRow.font = { bold: true };
     headerRow.alignment = { horizontal: 'center' };
     headerRow.eachCell(cell => {
-      cell.border = {
-        top: { style: 'thin' },
-        left: { style: 'thin' },
-        bottom: { style: 'thin' },
-        right: { style: 'thin' }
-      };
+        cell.border = {
+            top: { style: 'thin' },
+            left: { style: 'thin' },
+            bottom: { style: 'thin' },
+            right: { style: 'thin' }
+        };
     });
-  
+
     // Заполнение данными из массива products
     fillingcell(worksheet, products)
 
-    /*products.forEach((products, index) => {
-      // Определяем единицы измерения на основе типа товара
-      const unit = products.status === 1 ? 'кг' : 'шт';
-      
-      // Рассчитываем сумму для строки
-      const sum = products.price_unit * products.quantity;
-      totalSum += sum;
-  
-      const row = worksheet.addRow([
-        index + 1,
-        products.order_id,
-        products.a,
-        unit,
-        sum
-      ]);
-  
-      row.eachCell(cell => {
-        cell.border = {
-          top: { style: 'thin' },
-          left: { style: 'thin' },
-          bottom: { style: 'thin' },
-          right: { style: 'thin' }
-        };
-      });
-    });*/
-  
+
     // Итоговая строка
     const totalRowNum = worksheet.rowCount + 1;
     worksheet.mergeCells(`A${totalRowNum}:E${totalRowNum}`);
     worksheet.getCell(`A${totalRowNum}`).value = 'Итого (Выручка):';
     worksheet.getCell(`A${totalRowNum}`).font = { bold: true };
     worksheet.getCell(`A${totalRowNum}`).alignment = { horizontal: 'right' };
-  
+
     worksheet.getCell(`F${totalRowNum}`).value = totalSum.toFixed(2);
     worksheet.getCell(`F${totalRowNum}`).font = { bold: true };
-  
+
     // Дополнительная информация
     const infoRow1 = worksheet.addRow(['']);
     worksheet.mergeCells(`A${worksheet.rowCount}:F${worksheet.rowCount}`);
-    worksheet.getCell(`A${worksheet.rowCount}`).value = 
-      `Всего наименований ${products.length}, на сумму ${totalSum.toFixed(2)}`;
+    worksheet.getCell(`A${worksheet.rowCount}`).value =
+        `Всего наименований ${products.length}, на сумму ${totalSum.toFixed(2)}`;
     worksheet.getCell(`A${worksheet.rowCount}`).alignment = { horizontal: 'center' };
-  
+
     // Функция для преобразования числа в пропись (упрощенная версия)
 
-  
+
     const infoRow2 = worksheet.addRow(['']);
     worksheet.mergeCells(`A${worksheet.rowCount}:F${worksheet.rowCount}`);
     worksheet.getCell(`A${worksheet.rowCount}`).value = await convectorNumbersToWord(totalSum);
     worksheet.getCell(`A${worksheet.rowCount}`).font = { bold: true };
     worksheet.getCell(`A${worksheet.rowCount}`).alignment = { horizontal: 'center' };
-  
+
     // Подписи
     const signRow = worksheet.addRow(['']);
     worksheet.mergeCells(`A${worksheet.rowCount}:B${worksheet.rowCount}`);
     worksheet.getCell(`A${worksheet.rowCount}`).value = 'Руководитель ______ (______)';
-  
+
     worksheet.mergeCells(`E${worksheet.rowCount}:F${worksheet.rowCount}`);
     worksheet.getCell(`E${worksheet.rowCount}`).value = 'Бухгалтер ______ (______)';
-  
+
     // Сохранение файла
     const fileName = `Заказ_${buyer}.xlsx`;
     await workbook.xlsx.writeFile(fileName);
     console.log(`Файл "${fileName}" успешно создан!`);
     return fileName;
-  }
+}
 
-  async function generationRepProduct(product) {
+async function generationRepProduct(product) {
     const data = new Date()
     const d = data.toISOString().slice(0, 10).split('-').reverse().join(".")
     const workbook = new ExcelJS.Workbook()
@@ -261,15 +280,14 @@ async function foo(products, buyer = 'ЧАЙНАЯ ЛАВКА', day) {
         { width: 15 },  // Ед.
         { width: 15 }, // Цена
         { width: 15 }, // Сумма
-      ];
+    ];
     worksheet.mergeCells('B2:H2')
     worksheet.getCell('B2').value = `Отчетность по имеющимся товарам за ${d}`
     worksheet.insertRow(8, ["№", "Название товара", "Тип продукта", "Количество", "Цена", "Сумма"])
     await fillingcell(worksheet, product)
 
     const fileName = `Отчет_${d}.xlsx`;
-    await workbook.xlsx.writeFile(fileName);
-    return fileName;
+    await workbook.xlsx.write(fileName);
 
 }
 
@@ -280,30 +298,30 @@ async function fillingcell(worksheet, products) {
     products.forEach((products, index) => {
         // Определяем единицы измерения на основе типа товара
         const unit = products.status === 1 ? 'кг' : 'шт';
-        
+
         // Рассчитываем сумму для строки
         const sum = products.price_unit * products.quantity;
         totalSum += sum;
-        
+
         const row = worksheet.addRow([
-          index + 1,
-          products.product_name,
-          unit,
-          products.quantity,
-          products.price_unit,
-          sum
+            index + 1,
+            products.product_name,
+            unit,
+            products.quantity,
+            products.price_unit,
+            sum
         ]);
-        
+
         row.eachCell(cell => {
-          cell.border = {
-            top: { style: 'thin' },
-            left: { style: 'thin' },
-            bottom: { style: 'thin' },
-            right: { style: 'thin' }
-          };
+            cell.border = {
+                top: { style: 'thin' },
+                left: { style: 'thin' },
+                bottom: { style: 'thin' },
+                right: { style: 'thin' }
+            };
         });
-      });
-      return worksheet
+    });
+    return worksheet
 }
 
 
@@ -311,4 +329,4 @@ async function fillingcell(worksheet, products) {
 
 
 
-module.exports = {foo, generationRepProduct, generateProduct}
+module.exports = {foo, generationRepProduct, generateProduct, generateReportRevenueForPeriod}

@@ -27,6 +27,8 @@ router.put('/order/status', adminController.updateOrderStatus);
 // Route for creating an order via the platform
 router.post('/order/create', adminController.createOrder);
 
+router.delete('/order/delete', adminController.deleteOrder);
+
 router.get('/orders/', adminController.getOrdersbyStatus)
 
 router.get('/orders/all', adminController.getAllOrders)

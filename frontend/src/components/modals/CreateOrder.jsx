@@ -23,17 +23,24 @@ const CreateOrder = (props) => {
     const [openManualAdd, setOpenManualAdd] = useState(false);
     const [scanning, setScanning] = useState(false);
     const barcodeInputRef = useRef(null);
+    const [isEditingQuantity, setIsEditingQuantity] = useState(false);
 
     useEffect(() => {
         if (props.order && props.type === 'edit') {
             const items = props.order.items ||
                 (props.order.products ? props.order.products.map(p => ({
                     product_id: p.product_id,
-                    id: p.product_id,
                     name: p.product_name,
                     price: p.price,
                     quantity: p.quantity,
-                    total: p.price * p.quantity
+
+                    total: p.total,
+                    /*total: calculateItemTotal(p.price, p.quantity, p.price_for_grams),*/
+
+                    quantityInStock: p.quantityInStock,
+                    product_type: p.product_type,
+                    price_for_grams: p.price_for_grams,
+                    product_count_min: p.product_count_min
                 })) : []);
             setOrderItems(items);
         } else {
@@ -41,55 +48,110 @@ const CreateOrder = (props) => {
         }
     }, [props.order, props.type]);
 
-    const handleAddItem = (product) => {
+    const calculateItemTotal = (price, quantity, priceForGrams) => {
+        if (!priceForGrams || priceForGrams <= 0) {
+            return price * quantity;
+        }
+        return (price * quantity) / priceForGrams;
+    };
 
-        const existingItem = orderItems.find(item => item.product_id === product.product_id);
+
+    const handleAddItem = (product) => {
+        const productId = product.product_id;
+        const existingItem = orderItems.find(item => item.product_id === productId);
+
         if (existingItem) {
+            const newQuantity = existingItem.quantity + 1;
+
+            // Для редактирования: доступное = остаток на складе + исходное количество в заказе
+            const availableQuantity = props.type === 'edit'
+                ? product.quantityInStock + (props.order?.items?.find(i => i.product_id === productId)?.quantity || 0)
+                : product.quantityInStock;
+
+            if (availableQuantity !== null && newQuantity > availableQuantity) {
+                const availableForUser = availableQuantity - (props.type === 'edit' ? (props.order?.items?.find(i => i.product_id === productId)?.quantity || 0) : 0);
+                alert(`Недостаточно товара на складе. Доступно: ${availableForUser}`);
+                return;
+            }
+
             setOrderItems(prev =>
                 prev.map(item =>
-                    item.product_id === product.product_id
-                        ? {
-                            ...item,
-                            quantity: item.quantity + 1,
-                            total: parseInt(item.price) * (item.quantity + 1)
-                        }
+                    item.product_id === productId
+                        ? {...item, quantity: newQuantity, total: calculateItemTotal(item.price, newQuantity, item.price_for_grams)}
                         : item
                 )
             );
         } else {
+            // Для редактирования: доступное = остаток на складе + исходное количество в заказе
+            const availableQuantity = props.type === 'edit'
+                ? product.quantityInStock + (props.order?.items?.find(i => i.product_id === productId)?.quantity || 0)
+                : product.quantityInStock;
+
+            if (availableQuantity !== null && 1 > availableQuantity) {
+                const availableForUser = availableQuantity - (props.type === 'edit' ? (props.order?.items?.find(i => i.product_id === productId)?.quantity || 0) : 0);
+                alert(`Недостаточно товара на складе. Доступно: ${availableForUser}`);
+                return;
+            }
+
             setOrderItems(prev => [
                 ...prev,
                 {
                     ...product,
+                    product_id: productId,
                     quantity: 1,
-                    total: parseInt(product.price) || 0
+                    total: calculateItemTotal(product.price, 1, product.price_for_grams)
                 }
             ]);
         }
+    };
+
+
+    const handleQuantityChange = (itemId, newQuantity) => {
+        if (newQuantity < 1) return;
+        const item = orderItems.find(i => i.product_id === itemId);
+
+        // Для редактирования: доступное = остаток на складе + исходное количество в заказе
+        const availableQuantity = props.type === 'edit'
+            ? item.quantityInStock + (props.order?.items?.find(i => i.product_id === itemId)?.quantity || 0)
+            : item.quantityInStock;
+
+        // Проверка наличия на складе
+        if (availableQuantity !== null && newQuantity > availableQuantity) {
+            alert(`Недостаточно товара на складе. Доступно: ${availableQuantity - (props.type === 'edit' ? (props.order?.items?.find(i => i.product_id === itemId)?.quantity || 0) : 0)}`);
+            return;
+        }
+
+        // Обновляем количество
+        setOrderItems(prev =>
+            prev.map(item =>
+                item.product_id === itemId
+                    ? {...item, quantity: newQuantity, total: calculateItemTotal(item.price, newQuantity, item.price_for_grams)}
+                    : item
+            )
+        );
+    };
+
+    const formatPrice = (product) => {
+        if (product.product_type === 1) { // штуки
+            return `${product.price} руб. за шт.`;
+        } else if (product.product_type === 2 && product.price_for_grams) { // граммы
+            return `${product.price} руб. за ${product.price_for_grams} гр.`;
+        }
+        return `${product.price} руб.`;
     };
 
     const handleRemoveItem = (itemId) => {
         setOrderItems(prev => prev.filter(item => item.product_id !== itemId));
     };
 
-    const handleQuantityChange = (itemId, newQuantity) => {
-        if (newQuantity < 1) return;
-        setOrderItems(prev =>
-            prev.map(item => {
-                if (item.product_id === itemId) {
-                    const pricePerUnit = parseInt(item.price);
-                    return {
-                        ...item,
-                        quantity: newQuantity,
-                        total: pricePerUnit * newQuantity
-                    };
-                }
-                return item;
-            })
-        );
-    };
 
     const calculateTotal = () => {
+
+        return orderItems.reduce((sum, item) => sum + item.total, 0);
+        /*return orderItems.reduce((sum, item) => sum + calculateItemTotal(item.price, item.quantity, item.price_for_grams), 0);*/
+    };
+
+    const sumTotal = () => {
         return orderItems.reduce((sum, item) => sum + item.total, 0);
     };
 
@@ -98,7 +160,7 @@ const CreateOrder = (props) => {
             order_id: props.order?.order_id,
             status: props.order?.status || 0,
             items: orderItems.map(item => {
-                const productId = item.product_id || item.id;
+                const productId = item.product_id;
                 if (!productId) {
                     console.error("Ошибка: product_id не найден у товара", item);
                     throw new Error("Нельзя отправить товар без product_id");
@@ -106,7 +168,8 @@ const CreateOrder = (props) => {
                 return {
                     product_id: productId,
                     quantity: item.quantity,
-                    price: parseFloat(item.price) || 0
+                    price: item.price || 0,
+                    price_for_grams: item.price_for_grams,
                 };
             }),
             total: calculateTotal()
@@ -127,9 +190,8 @@ const CreateOrder = (props) => {
     // Сканер штрих-кодов
 
     useEffect(() => {
-        const handleKeyDown = (e) => {
-            // Активируем сканирование только при нажатии определённой клавиши (например, Ctrl)
-            if (props.open /*&& !scanning && e.ctrlKey*/) {
+        const handleKeyDown = () => {
+            if (props.open && !openManualAdd && !isEditingQuantity) {
                 setScanning(true);
                 if (barcodeInputRef.current) {
                     barcodeInputRef.current.focus();
@@ -139,11 +201,15 @@ const CreateOrder = (props) => {
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [props.open, scanning]);
+    }, [props.open, openManualAdd, isEditingQuantity]); // Убрали scanning из зависимостей
+
+
 
     const handleBarcodeChange = async (e) => {
+        if (isEditingQuantity) return;
+
         const code = e.target.value.trim();
-        if (code.length < 6) return;
+        if (code.length !== 36) return;
 
         try {
             const response = await fetch(`/api/product/barcode/${code}`);
@@ -153,30 +219,92 @@ const CreateOrder = (props) => {
 
             const product = await response.json();
 
-            // Добавляем проверку на существование продукта и его свойств
             if (!product || !product.product_id) {
                 throw new Error("Неверный формат данных товара");
             }
 
             handleAddItem({
+                ...product,
                 product_id: product.product_id,
-                id: product.product_id,
                 name: product.product_name || "Неизвестный товар",
                 price: product.price_unit || 0,
                 quantity: 1,
-                total: product.price_unit || 0
+                total: 0,
+                quantityInStock: product.quantity,
+                product_type: product.product_type,
+                price_for_grams: product.price_for_grams,
+                product_count_min: product.product_count_min
             });
 
             e.target.value = '';
+            setScanning(false); // Сбрасываем состояние сканирования сразу после успешного добавления
         } catch (err) {
             console.error("Ошибка сканирования:", err.message);
             alert(err.message || "Произошла ошибка при сканировании");
-        } finally {
-            // Добавляем небольшую задержку перед сбросом состояния сканирования
-            setTimeout(() => setScanning(false), 500);
+            e.target.value = '';
+            setOpenManualAdd(true);
+            setScanning(false); // Сбрасываем состояние при ошибке
         }
     };
 
+
+    const handleQuantityInputChange = (itemId, e) => {
+        const value = e.target.value;
+
+        // Разрешаем ввод только чисел и пустой строки
+        if (/^\d*$/.test(value)) {
+            setOrderItems(prev =>
+                prev.map(item =>
+                    item.product_id === itemId
+                        ? {
+                            ...item,
+                            quantity: value, // Сохраняем как строку, чтобы позволить пустое значение
+                            total: value === '' || isNaN(value)
+                                ? 0
+                                : calculateItemTotal(item.price, parseInt(value, 10), item.price_for_grams)
+                        }
+                        : item
+                )
+            );
+        }
+    };
+
+    const handleQuantityInputBlur = (itemId) => {
+        const item = orderItems.find(i => i.product_id === itemId);
+        if (!item) return;
+
+        const inputValue = item.quantity;
+        const parsedValue = parseInt(inputValue, 10);
+
+        let newQuantity;
+        if (isNaN(parsedValue) || parsedValue < 1) {
+            newQuantity = 1;
+        } else {
+            newQuantity = parsedValue;
+        }
+
+        // Для редактирования: доступное = остаток на складе + исходное количество в заказе
+        const availableQuantity = props.type === 'edit'
+            ? item.quantityInStock + (props.order?.items?.find(i => i.product_id === itemId)?.quantity || 0)
+            : item.quantityInStock;
+
+        // Проверка наличия на складе
+        if (availableQuantity !== null && newQuantity > availableQuantity) {
+            const availableForUser = availableQuantity - (props.type === 'edit' ? (props.order?.items?.find(i => i.product_id === itemId)?.quantity || 0) : 0);
+            alert(`Недостаточно товара на складе. Доступно: ${availableForUser}`);
+            newQuantity = availableForUser;
+        }
+
+        setOrderItems(prev =>
+            prev.map(i =>
+                i.product_id === itemId
+                    ? {...i, quantity: newQuantity, total: calculateItemTotal(i.price, newQuantity, i.price_for_grams)}
+                    : i
+            )
+        );
+
+        setIsEditingQuantity(false);
+    };
 
     return (
         <Modal
@@ -187,18 +315,33 @@ const CreateOrder = (props) => {
             sx={{zIndex: 5}}
         >
             <Box sx={style} className="popup__create-add-order">
-                {/*Проблемы с инпутом*/}
                 <input
                     type="text"
                     ref={barcodeInputRef}
                     onChange={handleBarcodeChange}
                     autoComplete="off"
-                    style={{position: 'absolute', top: "0", width: '100px', height: '100px'}}
+                    style={{
+                        position: 'absolute',
+                        opacity: 0,
+                        width: 0,
+                        height: 0,
+                        padding: 0,
+                        margin: 0,
+                        border: 'none',
+                        overflow: 'hidden',
+                        pointerEvents: scanning ? 'auto' : 'none' // Будет доступен только при сканировании
+                    }}
                 />
 
                 <AddManually
                     open={openManualAdd}
-                    onClose={() => setOpenManualAdd(false)}
+                    onClose={() => {
+                        setOpenManualAdd(false);/*
+                        barcodeInputRef.current.value = "";*/
+                        setScanning(true);
+                        }
+                    }
+
                     onAddProduct={handleAddItem}
                 />
 
@@ -244,10 +387,36 @@ const CreateOrder = (props) => {
                         <ol className="create-order__main-list">
                             {orderItems.map((item) => (
                                 <li key={item.product_id} className="create-order__main-item">
-                                    <p className="item__title item__info">{item.name}</p>
-                                    <p className="detail__price item__info">{item.price} руб.</p>
+
+                                    <p className="item__title item__info">
+                                        {item.name}
+                                        {item.quantityInStock !== null &&
+                                            <span className="stock-info">
+                                                {props.type === 'edit'
+                                                    ? ` (Доступно: ${item.quantityInStock + (props.order?.items?.find(i => i.product_id === item.product_id)?.quantity || 0)} ${item.product_type === 1 ? 'шт.' : 'гр.'})`
+                                                    : ` (Всего: ${item.quantityInStock} ${item.product_type === 1 ? 'шт.' : 'гр.'})`
+                                                }
+                                            </span>
+                                        }
+                                    </p>
+
+
+                                    <p className="detail__price item__info">
+                                        {formatPrice(item)}
+                                    </p>
                                     <p className="detail__amount item__info">
-                                        {item.quantity} шт.
+
+                                        <Input
+                                            type="text" // Меняем на text, чтобы можно было стирать полностью
+                                            value={item.quantity}
+                                            onChange={(e) => handleQuantityInputChange(item.product_id, e)}
+                                            onBlur={() => handleQuantityInputBlur(item.product_id)} // При выходе фиксируем min=1
+                                            onFocus={() => setIsEditingQuantity(true)}
+                                            className="quantity-input"
+                                        />
+
+
+                                        {item.product_type === 1 ? "шт." : "гр."}
                                         <Button
                                             className="button button_add"
                                             onClick={() => handleQuantityChange(item.product_id, item.quantity + 1)}
@@ -276,9 +445,16 @@ const CreateOrder = (props) => {
 
                 {orderItems.length > 0 && (
                     <div className="order-total">
-                        Итого: {calculateTotal()} руб.
+                        Итого:&#160;
+                        {props.type === "create" ?
+                            calculateTotal().toFixed(2) :
+                            sumTotal().toFixed(2)
+                        }&#160;руб.
+
                     </div>
                 )}
+
+
 
                 <div className="button-create-wrapper">
                     <Button

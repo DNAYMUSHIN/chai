@@ -34,10 +34,10 @@ const AddProduct = (props) => {
     const [formData, setFormData] = useState({
         product_name: '',
         product_category_id: '',
-        product_type: 'шт',
+        product_type: 1,
         product_price_unit: '0',
         quantity: '0',
-        price_for_grams: '100',
+        price_for_grams: null,
         product_count_min: '0',
         product_price_min: '0',
         product_code: ''
@@ -63,6 +63,20 @@ const AddProduct = (props) => {
         fetchCategories();
     }, []);
 
+    const resetForm = () => {
+        setFormData({
+            product_name: '',
+            product_category_id: '',
+            product_type: 1,
+            product_price_unit: '0',
+            quantity: '0',
+            price_for_grams: null,
+            product_count_min: '0',
+            product_price_min: '0',
+            product_code: ''
+        });
+    };
+
     // Инициализация формы при редактировании
     useEffect(() => {
         if (props.product && props.type === 'edit') {
@@ -70,10 +84,12 @@ const AddProduct = (props) => {
             setFormData({
                 product_name: product.product_name,
                 product_category_id: product.product_category_id?.toString() || '',
-                product_type: product.product_type === 1 ? 'шт' : 'гр',
+                product_type: product.product_type === 1 ? 1 : 2,
                 product_price_unit: product.price_unit?.toString() || '0',
                 quantity: product.quantity?.toString() || '0',
-                price_for_grams: product.price_for_grams?.toString() || '100',
+                price_for_grams: product.product_type === 1
+                    ? null
+                    : (product.price_for_grams !== null ? product.price_for_grams.toString() : '100'),
                 product_count_min: product.product_count_min?.toString() || '0',
                 product_price_min: product.product_price_min?.toString() || '0',
                 product_code: product.product_code?.toString() || ''
@@ -82,10 +98,10 @@ const AddProduct = (props) => {
             setFormData({
                 product_name: '',
                 product_category_id: '',
-                product_type: 'шт',
+                product_type: 1,
                 product_price_unit: '0',
                 quantity: '0',
-                price_for_grams: '100',
+                price_for_grams: null,
                 product_count_min: '0',
                 product_price_min: '0',
                 product_code: ''
@@ -114,12 +130,12 @@ const AddProduct = (props) => {
     };
 
     const handleTypeChange = (e) => {
-        const type = e.target.value;
+        const type = parseInt(e.target.value); // Приводим к числу
         setFormData(prev => ({
             ...prev,
             product_type: type,
             product_price_unit: '0',
-            ...(type === 'шт' ? {} : { price_for_grams: '100' })
+            ...(type === 1 ? {} : { price_for_grams: '100' })
         }));
     };
 
@@ -165,11 +181,14 @@ const AddProduct = (props) => {
 
         const submissionData = {
             product_name: formData.product_name,
+            product_category_id: formData.product_category_id,
             product_category: categoryName,
-            product_type: formData.product_type === 'шт' ? 1 : 2,
+            product_type: formData.product_type,
             product_price_unit: parseFloat(formData.product_price_unit) || 0,
             quantity: parseFloat(formData.quantity) || 0,
-            price_for_grams: formData.product_type === 'гр' ? parseInt(formData.price_for_grams) || 100 : null,
+            price_for_grams: formData.product_type === 2
+                ? parseInt(formData.price_for_grams) > 0 ? parseInt(formData.price_for_grams) : 100
+                : null,
             product_count_min: parseFloat(formData.product_count_min) || 0,
             product_price_min: parseFloat(formData.product_price_min) || 0,
             product_code: parseInt(formData.product_code) || null
@@ -177,6 +196,7 @@ const AddProduct = (props) => {
 
         if (props.type === 'add') {
             props.onAdd(submissionData);
+            resetForm();
         } else {
             const originalProduct = props.product.rawData;
             const updates = {};
@@ -185,21 +205,29 @@ const AddProduct = (props) => {
                 updates.product_name = formData.product_name;
 
             if (formData.product_category_id !== originalProduct.product_category_id?.toString())
-                updates.product_category = categoryName;
+                updates.product_category_id = formData.product_category_id;
 
-            const newType = formData.product_type === 'шт' ? 1 : 2;
-            if (newType !== originalProduct.product_type)
-                updates.product_type = newType;
+            if (formData.product_type !== originalProduct.product_type)
+                updates.product_type = formData.product_type;
 
-            if (parseFloat(formData.product_price_unit) !== originalProduct.price_unit)
+            if (parseFloat(formData.product_price_unit) !== parseFloat(originalProduct.price_unit))
                 updates.price_unit = parseFloat(formData.product_price_unit) || 0;
 
             if (parseFloat(formData.quantity) !== originalProduct.quantity)
                 updates.quantity = parseFloat(formData.quantity) || 0;
 
-            if (formData.product_type === 'гр') {
+
+
+            if (parseFloat(formData.product_count_min) !== parseFloat(originalProduct.product_count_min))
+                updates.product_count_min = parseFloat(formData.product_count_min) || 0;
+
+            if (parseFloat(formData.product_price_min) !== parseFloat(originalProduct.product_price_min))
+                updates.product_price_min = parseFloat(formData.product_price_min) || 0;
+
+
+            if (formData.product_type === 2) {
                 const newPriceForGrams = parseInt(formData.price_for_grams);
-                if (!isNaN(newPriceForGrams) && newPriceForGrams !== originalProduct.price_for_grams) {
+                if (!isNaN(newPriceForGrams) && newPriceForGrams > 0 && newPriceForGrams !== originalProduct.price_for_grams) {
                     updates.price_for_grams = newPriceForGrams;
                 }
             } else {
@@ -209,7 +237,11 @@ const AddProduct = (props) => {
                 }
             }
 
+            console.log("AAAAAAAAAAAAAAAAAAAAAA")
+            console.log(updates);
+
             props.onUpdate(updates);
+            resetForm();
         }
 
         props.handleClose();
@@ -285,16 +317,16 @@ const AddProduct = (props) => {
                             <RadioGroup
                                 row
                                 name="product_type"
-                                value={formData.product_type}
+                                value={formData.product_type.toString()} // Преобразуем в строку для RadioGroup
                                 onChange={handleTypeChange}
                             >
-                                <FormControlLabel value="шт" control={<Radio />} label="Штука" />
-                                <FormControlLabel value="гр" control={<Radio />} label="Граммы" />
+                                <FormControlLabel value="1" control={<Radio />} label="Штука" /> {/* Значение как строка */}
+                                <FormControlLabel value="2" control={<Radio />} label="Граммы" /> {/* Значение как строка */}
                             </RadioGroup>
 
                             <div className="create__gramm-price">
                                 <div className="create__gramm-text">
-                                    {formData.product_type === 'шт' ? (
+                                    {formData.product_type === 1 ? (
                                         <>
                                             <Input
                                                 placeholder="0"
@@ -357,7 +389,7 @@ const AddProduct = (props) => {
                                         inputProps={{ inputMode: 'numeric', pattern: '[0-9.]*' }}
                                     />
                                     &nbsp;
-                                    {formData.product_type === 'шт' ? 'штук' : 'грамм'}
+                                    {formData.product_type === 1 ? 'штук' : 'грамм'}
                                 </div>
                             </div>
                         </div>
