@@ -56,115 +56,78 @@ const CreateOrder = (props) => {
     };
 
 
-
     const handleAddItem = (product) => {
-        const productId = product.product_id; // ← используем правильное поле
-
-
+        const productId = product.product_id;
         const existingItem = orderItems.find(item => item.product_id === productId);
 
         if (existingItem) {
             const newQuantity = existingItem.quantity + 1;
-            if (product.quantity !== null && newQuantity > product.quantityInStock) {
-                alert(`Недостаточно товара на складе. Доступно: ${product.quantityInStock}`);
+
+            // Для редактирования: доступное = остаток на складе + исходное количество в заказе
+            const availableQuantity = props.type === 'edit'
+                ? product.quantityInStock + (props.order?.items?.find(i => i.product_id === productId)?.quantity || 0)
+                : product.quantityInStock;
+
+            if (availableQuantity !== null && newQuantity > availableQuantity) {
+                const availableForUser = availableQuantity - (props.type === 'edit' ? (props.order?.items?.find(i => i.product_id === productId)?.quantity || 0) : 0);
+                alert(`Недостаточно товара на складе. Доступно: ${availableForUser}`);
                 return;
             }
+
             setOrderItems(prev =>
                 prev.map(item =>
                     item.product_id === productId
-                        ? {
-                            ...item,
-                            quantity: newQuantity,
-                            total: calculateItemTotal(item.price, newQuantity, item.price_for_grams)
-                        }
+                        ? {...item, quantity: newQuantity, total: calculateItemTotal(item.price, newQuantity, item.price_for_grams)}
                         : item
                 )
             );
         } else {
-            if (product.quantity !== null && 1 > product.quantityInStock) {
-                alert(`Недостаточно товара на складе. Доступно: ${product.quantityInStock}`);
+            // Для редактирования: доступное = остаток на складе + исходное количество в заказе
+            const availableQuantity = props.type === 'edit'
+                ? product.quantityInStock + (props.order?.items?.find(i => i.product_id === productId)?.quantity || 0)
+                : product.quantityInStock;
+
+            if (availableQuantity !== null && 1 > availableQuantity) {
+                const availableForUser = availableQuantity - (props.type === 'edit' ? (props.order?.items?.find(i => i.product_id === productId)?.quantity || 0) : 0);
+                alert(`Недостаточно товара на складе. Доступно: ${availableForUser}`);
                 return;
             }
+
             setOrderItems(prev => [
                 ...prev,
                 {
                     ...product,
-                    product_id: productId, // ← присваиваем product_id для корректного поиска
+                    product_id: productId,
                     quantity: 1,
                     total: calculateItemTotal(product.price, 1, product.price_for_grams)
                 }
             ]);
         }
     };
-    /*const handleAddItem = (product) => {
-        /!*const existingItem = orderItems.find(item => item.product_id === product.product_id);
 
-        const existingItem = orderItems.find(
-            item => item.product_id === product.product_id
-        );
-
-
-
-        if (existingItem) {
-            const newQuantity = existingItem.quantity + 1;
-            if (product.quantity !== null && newQuantity > product.quantityInStock) {
-                alert(`Недостаточно товара на складе. Доступно: ${product.quantityInStock}`);
-                return;
-            }
-            setOrderItems(prev =>
-                prev.map(item =>
-                    item.product_id === product.product_id
-                        ? {
-                            ...item,
-                            quantity: newQuantity,
-                            total: calculateItemTotal(item.price, newQuantity, item.price_for_grams)
-                        }
-                        : item
-                )
-            );
-        } else {
-            if (product.quantity !== null && 1 > product.quantityInStock) {
-                alert(`Недостаточно товара на складе. Доступно: ${product.quantityInStock}`);
-                return;
-            }
-            setOrderItems(prev => [
-                ...prev,
-                {
-                    ...product,
-                    quantity: 1,
-                    total: calculateItemTotal(product.price, 1, product.price_for_grams)
-                }
-            ]);
-        }
-    };*/
 
     const handleQuantityChange = (itemId, newQuantity) => {
         if (newQuantity < 1) return;
         const item = orderItems.find(i => i.product_id === itemId);
 
+        // Для редактирования: доступное = остаток на складе + исходное количество в заказе
+        const availableQuantity = props.type === 'edit'
+            ? item.quantityInStock + (props.order?.items?.find(i => i.product_id === itemId)?.quantity || 0)
+            : item.quantityInStock;
+
         // Проверка наличия на складе
-        if (item.quantityInStock !== null && newQuantity > item.quantityInStock) {
-            alert(`Недостаточно товара на складе. Доступно: ${item.quantityInStock}`);
+        if (availableQuantity !== null && newQuantity > availableQuantity) {
+            alert(`Недостаточно товара на складе. Доступно: ${availableQuantity - (props.type === 'edit' ? (props.order?.items?.find(i => i.product_id === itemId)?.quantity || 0) : 0)}`);
             return;
         }
 
-        // Проверка минимального количества
-        if (item.product_count_min && newQuantity < 1) {
-            alert(`Минимальное количество для заказа: 1`);
-            return;
-        }
-
+        // Обновляем количество
         setOrderItems(prev =>
-            prev.map(item => {
-                if (item.product_id === itemId) {
-                    return {
-                        ...item,
-                        quantity: newQuantity,
-                        total: calculateItemTotal(item.price, newQuantity, item.price_for_grams)
-                    };
-                }
-                return item;
-            })
+            prev.map(item =>
+                item.product_id === itemId
+                    ? {...item, quantity: newQuantity, total: calculateItemTotal(item.price, newQuantity, item.price_for_grams)}
+                    : item
+            )
         );
     };
 
@@ -227,7 +190,7 @@ const CreateOrder = (props) => {
     // Сканер штрих-кодов
 
     useEffect(() => {
-        const handleKeyDown = (e) => {
+        const handleKeyDown = () => {
             if (props.open && !openManualAdd && !isEditingQuantity) {
                 setScanning(true);
                 if (barcodeInputRef.current) {
@@ -308,50 +271,40 @@ const CreateOrder = (props) => {
 
     const handleQuantityInputBlur = (itemId) => {
         const item = orderItems.find(i => i.product_id === itemId);
-
         if (!item) return;
 
         const inputValue = item.quantity;
         const parsedValue = parseInt(inputValue, 10);
 
         let newQuantity;
-
         if (isNaN(parsedValue) || parsedValue < 1) {
             newQuantity = 1;
         } else {
             newQuantity = parsedValue;
         }
 
+        // Для редактирования: доступное = остаток на складе + исходное количество в заказе
+        const availableQuantity = props.type === 'edit'
+            ? item.quantityInStock + (props.order?.items?.find(i => i.product_id === itemId)?.quantity || 0)
+            : item.quantityInStock;
+
         // Проверка наличия на складе
-        if (item.quantityInStock !== null && newQuantity > item.quantityInStock) {
-            alert(`Недостаточно товара на складе. Доступно: ${item.quantityInStock}`);
-            newQuantity = item.quantityInStock;
+        if (availableQuantity !== null && newQuantity > availableQuantity) {
+            const availableForUser = availableQuantity - (props.type === 'edit' ? (props.order?.items?.find(i => i.product_id === itemId)?.quantity || 0) : 0);
+            alert(`Недостаточно товара на складе. Доступно: ${availableForUser}`);
+            newQuantity = availableForUser;
         }
 
-        // Обновляем с корректным числом
         setOrderItems(prev =>
             prev.map(i =>
                 i.product_id === itemId
-                    ? {
-                        ...i,
-                        quantity: newQuantity,
-                        total: calculateItemTotal(i.price, newQuantity, i.price_for_grams)
-                    }
+                    ? {...i, quantity: newQuantity, total: calculateItemTotal(i.price, newQuantity, i.price_for_grams)}
                     : i
             )
         );
 
         setIsEditingQuantity(false);
     };
-
-    /*const handleQuantityInputChange = (itemId, e) => {
-        const value = e.target.value;
-        // Проверяем, что введено число и оно не отрицательное
-        if (/^\d*$/.test(value)) {
-            const newQuantity = value === '' ? 0 : parseInt(value, 10);
-            handleQuantityChange(itemId, newQuantity);
-        }
-    };*/
 
     return (
         <Modal
@@ -434,13 +387,20 @@ const CreateOrder = (props) => {
                         <ol className="create-order__main-list">
                             {orderItems.map((item) => (
                                 <li key={item.product_id} className="create-order__main-item">
+
                                     <p className="item__title item__info">
                                         {item.name}
                                         {item.quantityInStock !== null &&
-                                            <span
-                                                className="stock-info"> (Всего: {item.quantityInStock} {item.product_type === 1 ? 'шт.' : 'гр.'})</span>
+                                            <span className="stock-info">
+                                                {props.type === 'edit'
+                                                    ? ` (Доступно: ${item.quantityInStock + (props.order?.items?.find(i => i.product_id === item.product_id)?.quantity || 0)} ${item.product_type === 1 ? 'шт.' : 'гр.'})`
+                                                    : ` (Всего: ${item.quantityInStock} ${item.product_type === 1 ? 'шт.' : 'гр.'})`
+                                                }
+                                            </span>
                                         }
                                     </p>
+
+
                                     <p className="detail__price item__info">
                                         {formatPrice(item)}
                                     </p>
@@ -455,16 +415,8 @@ const CreateOrder = (props) => {
                                             className="quantity-input"
                                         />
 
-                                        {/*<Input
-                                            type="number"
-                                            min="1"
-                                            value={item.quantity}
-                                            onChange={(e) => handleQuantityInputChange(item.product_id, e)}
-                                            className="quantity-input"
-                                            onFocus={() => setIsEditingQuantity(true)}
-                                            onBlur={() => setIsEditingQuantity(false)}
-                                        />*/}
-                                        {item.product_type === 1? "шт." : "гр."}
+
+                                        {item.product_type === 1 ? "шт." : "гр."}
                                         <Button
                                             className="button button_add"
                                             onClick={() => handleQuantityChange(item.product_id, item.quantity + 1)}

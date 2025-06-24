@@ -332,8 +332,6 @@ class adminController {
             return regex.test(uuid);
         }
 
-        console.log("aaaaaaaaaaaaaaaaaaa1")
-
         try {
             if (!product_id || !isValidUUID(product_id)) {
                 return res.status(400).json({ error: 'Неверный ID товара' });
@@ -351,11 +349,12 @@ class adminController {
             let fieldsToUpdate = [];
             let values = [];
             let paramIndex = 1;
+            let shouldUpdateStatus = false;
+            let newStatus = null;
 
             for (const field in updates) {
                 const value = updates[field];
 
-                console.log("aaaaaaaaaaaaaaaaaaa")
                 switch (field) {
                     case 'product_name':
                         if (typeof value !== 'string' || !value.trim()) {
@@ -391,15 +390,7 @@ class adminController {
                         // Добавляем только один раз
                         fieldsToUpdate.push(`product_type = $${paramIndex++}`);
                         values.push(numericType);
-/*
-                        console.log("aaaaaaaaaaaaaaaaaaaAA3")
-                        if (numericType === 1) {
-                            // Устанавливаем price_for_grams = NULL при смене на штучный тип
-                            fieldsToUpdate.push(`price_for_grams = $${paramIndex++}`);
-                            values.push(null);
-                        }
 
-                        console.log("aaaaaaaaaaaaaaaaaaaAA4")*/
                         break;
 
                     case 'price_unit':
@@ -418,6 +409,12 @@ class adminController {
                         }
                         fieldsToUpdate.push(`quantity = $${paramIndex++}`);
                         values.push(quantity);
+
+
+
+                        // Определяем новый статус на основе количества
+                        newStatus = quantity > 0 ? 1 : 0;
+                        shouldUpdateStatus = true;
                         break;
 
                     case 'price_for_grams':
@@ -446,7 +443,6 @@ class adminController {
                         fieldsToUpdate.push(`price_for_grams = $${paramIndex++}`);
                         values.push(priceForGrams);
                         break;
-
                     case 'product_count_min':
                         const countMin = parseFloat(value);
                         if (isNaN(countMin) || countMin < 0) {
@@ -480,6 +476,11 @@ class adminController {
             }
             console.log("aaaaaaaaaaaaaaaaaaa6")
 
+            if (shouldUpdateStatus) {
+                fieldsToUpdate.push(`product_status = $${paramIndex++}`);
+                values.push(newStatus);
+            }
+
             // Также проверяем, если type поменялся на 1 и price_for_grams ещё не был обновлён
             const wasTypeChangedToShT = updates.product_type && Number(updates.product_type) === 1;
             const priceForGramsAlreadyUpdated = fieldsToUpdate.some(f => f.includes('price_for_grams'));
@@ -492,7 +493,10 @@ class adminController {
 
             console.log("aaaaaaaaaaaaaaaaaaa8")
             if (fieldsToUpdate.length === 0) {
-                return res.status(400).json({ error: 'Нет данных для обновления' });
+                return res.status(200).json({
+                    message: 'Нет изменений для обновления',
+                    product: currentProduct.rows[0]
+                });
             }
 
             console.log("aaaaaaaaaaaaaaaaaaa9")
@@ -1403,6 +1407,116 @@ class adminController {
         }
 
         try {
+            await db.query('BEGIN');
+
+            // 1. Обновляем статус заказа, если он передан
+            if (status !== undefined) {
+                await db.query(
+                    `UPDATE orders SET status = $1 WHERE order_id = $2`,
+                    [status, order_id]
+                );
+            }
+
+            // 2. Если передан новый состав заказа
+            if (products && Array.isArray(products)) {
+                // Получаем старые позиции заказа
+                const oldItems = await db.query(
+                    `SELECT product_id, quantity FROM orderitems WHERE order_id = $1`,
+                    [order_id]
+                );
+
+                // Создаем карту для быстрого доступа к старым количествам
+                const oldItemsMap = new Map();
+                for (const item of oldItems.rows) {
+                    oldItemsMap.set(item.product_id, item.quantity);
+                }
+
+                // Рассчитываем разницу количеств
+                const quantityDeltas = new Map();
+                for (const product of products) {
+                    const oldQty = oldItemsMap.get(product.product_id) || 0;
+                    quantityDeltas.set(product.product_id, product.quantity - oldQty);
+                }
+
+                // Обновляем остатки на складе
+                for (const [productId, delta] of quantityDeltas) {
+                    if (delta !== 0) {
+                        await db.query(
+                            `UPDATE product SET quantity = quantity - $1 
+                         WHERE product_id = $2`,
+                            [delta, productId]
+                        );
+                    }
+                }
+
+                // Удаляем старые позиции заказа
+                await db.query(
+                    `DELETE FROM orderitems WHERE order_id = $1`,
+                    [order_id]
+                );
+
+                // Добавляем новые позиции
+                let total = 0;
+                for (const product of products) {
+                    await db.query(
+                        `INSERT INTO orderitems 
+                     (order_id, product_id, quantity, price) 
+                     VALUES ($1, $2, $3, $4)`,
+                        [order_id, product.product_id, product.quantity, product.price]
+                    );
+
+                    if (product.price_for_grams) {
+                        total += product.price * product.quantity / product.price_for_grams;
+                    } else {
+                        total += product.price * product.quantity;
+                    }
+                }
+
+                // Обновляем общую сумму заказа
+                await db.query(
+                    `UPDATE orders SET total = $1 WHERE order_id = $2`,
+                    [total, order_id]
+                );
+            }
+
+            // Получаем обновленный заказ с товарами
+            const updatedOrder = await db.query(`
+            SELECT o.*, 
+                   json_agg(json_build_object(
+                       'product_name', p.product_name,
+                       'quantity', oi.quantity,
+                       'price', oi.price,
+                       'product_id', p.product_id
+                   )) as products
+            FROM Orders o
+            LEFT JOIN OrderItems oi ON o.order_id = oi.order_id
+            LEFT JOIN Product p ON oi.product_id = p.product_id
+            WHERE o.order_id = $1
+            GROUP BY o.order_id
+        `, [order_id]);
+
+            await db.query('COMMIT');
+
+            res.status(200).json({
+                message: 'Заказ успешно обновлен',
+                order: updatedOrder.rows[0]
+            });
+        } catch (err) {
+            await db.query('ROLLBACK');
+            console.error('Ошибка при обновлении заказа:', err);
+            res.status(500).json({error: 'Ошибка сервера при обновлении заказа'});
+        }
+    }
+
+
+    /*async updateOrder(req, res) {
+        const {order_id, status, products} = req.body;
+
+        if (!order_id) {
+            return res.status(400).json({error: 'ID заказа обязательно'});
+        }
+
+        try {
             // Начинаем транзакцию
             await db.query('BEGIN');
 
@@ -1499,7 +1613,7 @@ class adminController {
             console.error('Ошибка при обновлении заказа:', err);
             res.status(500).json({error: 'Ошибка сервера при обновлении заказа'});
         }
-    }
+    }*/
 
     // Поиск товара по штрих-коду
     async getProductByBarcode(req, res) {

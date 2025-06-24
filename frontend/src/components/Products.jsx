@@ -33,6 +33,47 @@ const Products = () => {
     const [openDeleteModal, setOpenDeleteModal] = useState(false);
     const [productToDelete, setProductToDelete] = useState(null);
 
+    const [sortField, setSortField] = useState(null); // Поле, по которому сейчас сортируем
+    const [sortDirection, setSortDirection] = useState('asc'); // Направление сортировки
+
+    const handleSort = (field) => {
+        if (sortField === field) {
+            // Меняем направление, если кликнули на тот же заголовок
+            setSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'));
+        } else {
+            // Устанавливаем новое поле и дефолтное направление
+            setSortField(field);
+            setSortDirection('asc');
+        }
+    };
+
+    const getSortableValue = (product, field) => {
+        switch (field) {
+            case 'name':
+                return product.name.toLowerCase();
+            case 'status':
+                return product.status;
+            case 'price':
+                return parseFloat(product.rawData.price_unit) || 0;
+            case 'unit':
+                // Группируем: сначала граммы, потом штуки. Внутри — по unitAmount
+                return [product.unitType === 'grams' ? 0 : 1, product.unitAmount];
+            case 'amount':
+                return product.quantity;
+            case 'category':
+                return product.category.toLowerCase();
+            default:
+                return null;
+        }
+    };
+
+
+    const renderArrow = (field) => {
+        if (sortField !== field) return '';
+        return sortDirection === 'asc' ? ' ▲' : ' ▼';
+    };
+
+
     // Функция для открытия модального окна удаления
     const handleOpenDeleteModal = (productId) => {
         setProductToDelete(productId);
@@ -81,20 +122,34 @@ const Products = () => {
 
             const data = await response.json();
             const formattedProducts = data.map(product => {
-                // Находим название категории по ID
                 const category = categories.find(c => c.category_id === product.product_category_id);
 
+                let unitType = 'pieces';
+                let unitAmount = 1;
+
+                if (product.product_type === 2) {
+                    // Это весовой товар
+                    unitType = 'grams';
+                    unitAmount = parseInt(product.price_for_grams, 10) || 100;
+                } else {
+                    // Штучный
+                    unitAmount = 1;
+                }
+
+                const quantity = parseInt(product.quantity, 10) || 0;
 
                 return {
                     id: product.product_id,
                     name: product.product_name,
-                    status: product.product_status === 1 ? 'В наличии' :
-                        product.product_status === 0 ? 'Нет в наличии' : "К закупке",
+                    status: product.product_status === 1 ? 'В наличии' : 'Нет в наличии',
                     price: `${product.price_unit} руб.${product.product_type === 2 ? ` за ${product.price_for_grams} г` : ''}`,
-                    unit: product.product_type === 1 ? '1 шт.' : `100 г`,
-                    amount: `${product.quantity} ${product.product_type === 1 ? 'шт.' : 'г'}`,
+                    unit: product.product_type === 1 ? '1 шт.' : `${unitAmount} г`,
+                    amount: `${quantity} ${product.product_type === 1 ? 'шт.' : 'г'}`,
                     category: category ? category.category_name : 'Без категории',
-                    rawData: product
+                    rawData: product,
+                    unitType,
+                    unitAmount,
+                    quantity
                 };
             });
 
@@ -107,13 +162,6 @@ const Products = () => {
         }
     };
 
-    /* useEffect(() => {
-         fetchCategories().then(() => {
-                 console.log(categories);
-                 fetchProducts();
-             }
-         );
-     }, []);*/
 
 
 
@@ -121,6 +169,7 @@ const Products = () => {
         const loadData = async () => {
             try {
                 setLoading(true);
+
                 // Сначала загружаем категории
                 const categoriesResponse = await fetch(API_CATEGORIES);
                 if (!categoriesResponse.ok) throw new Error('Ошибка загрузки категорий');
@@ -132,22 +181,40 @@ const Products = () => {
                 if (!productsResponse.ok) throw new Error(`HTTP error! status: ${productsResponse.status}`);
                 const productsData = await productsResponse.json();
 
-                // Форматируем товары с учетом загруженных категорий
+                // Форматируем товары с учетом загруженных категорий И добавляем unitType, unitAmount, quantity
                 const formattedProducts = productsData.map(product => {
                     const category = categoriesData.find(c => c.category_id === product.product_category_id);
+
+                    let unitType = 'pieces';
+                    let unitAmount = 1;
+                    if (product.product_type === 2) {
+                        unitType = 'grams';
+                        unitAmount = parseInt(product.price_for_grams, 10) || 100;
+                    } else {
+                        unitAmount = 1;
+                    }
+
+                    const quantity = parseInt(product.quantity, 10) || 0;
+
                     return {
                         id: product.product_id,
                         name: product.product_name,
                         status: product.product_status === 1 ? 'В наличии' : 'Нет в наличии',
                         price: `${product.price_unit} руб.${product.product_type === 2 ? ` за ${product.price_for_grams} г` : ''}`,
-                        unit: product.product_type === 1 ? '1 шт.' : `${product.quantity} г`,
-                        amount: `${product.quantity} ${product.product_type === 1 ? 'шт.' : 'г'}`,
+                        unit: product.product_type === 1 ? '1 шт.' : `${unitAmount} г`,
+                        amount: `${quantity} ${product.product_type === 1 ? 'шт.' : 'г'}`,
                         category: category ? category.category_name : 'Без категории',
-                        rawData: product
+                        rawData: product,
+
+                        // Эти поля нужны для сортировки:
+                        unitType,
+                        unitAmount,
+                        quantity
                     };
                 });
 
                 setProducts(formattedProducts);
+
             } catch (err) {
                 console.error("Ошибка при загрузке данных:", err);
                 setError("Не удалось загрузить данные. Попробуйте позже.");
@@ -159,9 +226,8 @@ const Products = () => {
         loadData();
     }, []);
 
-
-
-    // Обновляем товары при изменении категорий
+// Обновляем товары при изменении категорий
+    /*
     useEffect(() => {
         if (categories.length > 0 && products.length > 0) {
             const updatedProducts = products.map(product => {
@@ -173,7 +239,7 @@ const Products = () => {
             });
             setProducts(updatedProducts);
         }
-    }, [categories]);
+    }, [categories]);*/
 
     // Фильтрация товаров
     const filteredProducts = products.filter(product =>
@@ -285,6 +351,28 @@ const Products = () => {
     };
 
 
+
+    const sortedProducts = [...filteredProducts].sort((a, b) => {
+        if (!sortField) return 0;
+
+        const valueA = getSortableValue(a, sortField);
+        const valueB = getSortableValue(b, sortField);
+
+        if (Array.isArray(valueA) && Array.isArray(valueB)) {
+            // Для unit сравниваем сначала по типу (граммы vs штуки), потом по величине
+            if (valueA[0] !== valueB[0]) {
+                return sortDirection === 'asc' ? valueA[0] - valueB[0] : valueB[0] - valueA[0];
+            }
+            return sortDirection === 'asc' ? valueA[1] - valueB[1] : valueB[1] - valueA[1];
+        }
+
+        if (valueA < valueB) return sortDirection === 'asc' ? -1 : 1;
+        if (valueA > valueB) return sortDirection === 'asc' ? 1 : -1;
+        return 0;
+    });
+
+
+
     return (
         <section className="workspace products">
             <Excel open={openExcel} handleClose={() => setOpenExcel(false)}/>
@@ -319,18 +407,37 @@ const Products = () => {
                     onChange={(e) => setSearchTerm(e.target.value)}
                 />
                 <ul className="workspace__features">
-                    <li className="workspace__feature">Наименование</li>
-                    <li className="workspace__feature">Статус</li>
-                    <li className="workspace__feature">Цена за ед.</li>
-                    <li className="workspace__feature">Измерительная еденица</li>
-                    <li className="workspace__feature">Общее кол-во</li>
-                    <li className="workspace__feature">Категория</li>
+                    <li className="workspace__feature">
+                        <button onClick={() => handleSort('name')}>Наименование{renderArrow('name')}</button>
+                    </li>
+                    <li className="workspace__feature">
+                        <button onClick={() => handleSort('status')}>Статус{renderArrow('status')}</button>
+                    </li>
+                    <li className="workspace__feature">
+                        <button onClick={() => handleSort('price')}>Цена за ед.{renderArrow('price')}</button>
+                    </li>
+                    <li className="workspace__feature">
+                        <button onClick={() => handleSort('unit')}>Измерительная
+                            единица{renderArrow('unit')}</button>
+                    </li>
+                    <li className="workspace__feature">
+                        <button onClick={() => handleSort('amount')}>Общее кол-во{renderArrow('amount')}</button>
+                    </li>
+                    <li className="workspace__feature">
+                        <button onClick={() => handleSort('category')}>Категория{renderArrow('category')}</button>
+                    </li>
                     <li className="workspace__feature">Изменить</li>
+                    {/*<li className="workspace__feature">Наименование</li>
+                <li className="workspace__feature">Статус</li>
+                <li className="workspace__feature">Цена за ед.</li>
+                <li className="workspace__feature">Измерительная еденица</li>
+                <li className="workspace__feature">Общее кол-во</li>
+                <li className="workspace__feature">Категория</li>*/}
                 </ul>
             </div>
 
             <div className="workspace__main">
-                {loading ? (
+            {loading ? (
                     <div className="workspace__loading">Загрузка товаров...</div>
                 ) : error ? (
                     <div className="workspace__error">{error}</div>
@@ -340,7 +447,7 @@ const Products = () => {
                     </div>
                 ) : (
                     <ul className="workspace__list orders-list">
-                        {filteredProducts.map((product) => (
+                        {sortedProducts.map((product) => (
                             <li key={product.id} className="workspace__item product">
                                 <p className="order__number product__info">{product.name}</p>
                                 <p className="status product__info">{product.status}</p>
