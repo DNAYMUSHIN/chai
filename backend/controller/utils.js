@@ -93,7 +93,8 @@ async function generateProduct(products, res, buyer = 'ЧАЙНАЯ ЛАВКА')
             { width: 5 },  // №
             { width: 25 }, // Товар
             { width: 10 }, // Кол-во
-            { width: 5 },  // Ед.
+            {width: 20}, // Минальное количество
+            { width: 10 },  // Ед.
             { width: 10 }, // Цена
             { width: 10 }  // Сумма
         ];
@@ -103,7 +104,7 @@ async function generateProduct(products, res, buyer = 'ЧАЙНАЯ ЛАВКА')
         worksheet.getCell('A1').font = { bold: true, size: 14 };
         worksheet.getCell('A1').alignment = { horizontal: 'center' };
 
-        const headerRow = worksheet.addRow(['№', 'Товар', 'Количество', 'Ед.', 'Цена', 'Сумма']);
+        const headerRow = worksheet.addRow(['№', 'Товар', 'Количество', 'Минимальное количество','Ед', 'Цена', 'Сумма']);
         headerRow.font = { bold: true };
         headerRow.alignment = { horizontal: 'center' };
         headerRow.eachCell(cell => {
@@ -193,22 +194,12 @@ async function foo(products, buyer = 'ЧАЙНАЯ ЛАВКА', day) {
     worksheet.getCell('A1').font = { bold: true, size: 14 };
     worksheet.getCell('A1').alignment = { horizontal: 'center' };
 
-    // Покупатель и поставщик
-    // worksheet.mergeCells('A3:F3');
-    // worksheet.getCell('A3').value = 'Покупатель:';
-    // worksheet.getCell('A3').font = { bold: true };
+
 
     worksheet.mergeCells('A4:G4');
     worksheet.getCell('A4').value = `"${buyer}"`;
     worksheet.getCell('A4').alignment = { horizontal: 'center' };
 
-    // worksheet.mergeCells('A5:F5');
-    // worksheet.getCell('A5').value = 'Поставщик:';
-    // worksheet.getCell('A5').font = { bold: true };
-
-    // worksheet.mergeCells('A6:F6');
-    // worksheet.getCell('A6').value = '"______"';
-    // worksheet.getCell('A6').alignment = { horizontal: 'center' };
 
     // Шапка таблицы
     const headerRow = worksheet.addRow(['№', 'Товар', 'Количество', 'Ед.', 'Цена', 'Сумма']);
@@ -277,6 +268,7 @@ async function generationRepProduct(product) {
         { width: 5 },  // №
         { width: 25 }, // Товар
         { width: 15 }, // Кол-во
+        {width: 20}, // Мин Количество
         { width: 15 },  // Ед.
         { width: 15 }, // Цена
         { width: 15 }, // Сумма
@@ -297,7 +289,7 @@ async function fillingcell(worksheet, products) {
     let totalSum = 0;
     products.forEach((products, index) => {
         // Определяем единицы измерения на основе типа товара
-        const unit = products.status === 1 ? 'кг' : 'шт';
+        const unit = products.status === 1 ? 'г' : 'шт';
 
         // Рассчитываем сумму для строки
         const sum = products.price_unit * products.quantity;
@@ -308,6 +300,7 @@ async function fillingcell(worksheet, products) {
             products.product_name,
             unit,
             products.quantity,
+            products.product_count_min,
             products.price_unit,
             sum
         ]);
